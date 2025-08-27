@@ -412,7 +412,7 @@ export default function TankSpecifications() {
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">Loading...</TableCell>
                 </TableRow>
-              ) : specifications?.length === 0 ? (
+              ) : !specifications || specifications.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No tank specifications found

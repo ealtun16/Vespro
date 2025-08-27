@@ -1,16 +1,20 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterialSchema } from "@shared/schema";
 import multer from "multer";
 import * as XLSX from "xlsx";
 
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
+
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
         file.mimetype === 'application/vnd.ms-excel') {
       cb(null, true);
@@ -157,7 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Excel Import route
-  app.post("/api/import/excel", upload.single('file'), async (req, res) => {
+  app.post("/api/import/excel", upload.single('file'), async (req: MulterRequest, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -187,12 +191,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { analyses } = await storage.getAllCostAnalyses(1, 1000); // Get all for export
       
-      const exportData = analyses.map(analysis => ({
+      const exportData = analyses.map((analysis: any) => ({
         'Report ID': analysis.reportId,
-        'Tank Type': analysis.tankType,
-        'Tank Name': analysis.tankName,
-        'Capacity (L)': analysis.capacity,
-        'Height (mm)': analysis.height,
+        'Tank Type': analysis.tankType || 'N/A',
+        'Tank Name': analysis.tankName || 'N/A',
+        'Capacity (L)': analysis.capacity || 0,
+        'Height (mm)': analysis.height || 0,
         'Material Cost': analysis.materialCost,
         'Labor Cost': analysis.laborCost,
         'Overhead Cost': analysis.overheadCost,
@@ -235,7 +239,7 @@ async function processExcelData(data: any[]): Promise<any[]> {
             capacity: parseInt(row['Capacity']) || 1000,
             height: parseInt(row['Height']) || 2000,
             material: row['Material'] || 'Steel',
-            thickness: parseFloat(row['Thickness']) || 10,
+            thickness: parseFloat(row['Thickness']) || undefined,
           });
         }
 
@@ -243,10 +247,10 @@ async function processExcelData(data: any[]): Promise<any[]> {
         const costAnalysis = await storage.createCostAnalysis({
           reportId: row['Report ID'] || `IMP-${Date.now()}`,
           tankSpecificationId: tankSpec?.id,
-          materialCost: parseFloat(row['Material Cost']) || 0,
-          laborCost: parseFloat(row['Labor Cost']) || 0,
-          overheadCost: parseFloat(row['Overhead Cost']) || 0,
-          totalCost: parseFloat(row['Total Cost']),
+          materialCost: String(parseFloat(row['Material Cost']) || 0),
+          laborCost: String(parseFloat(row['Labor Cost']) || 0),
+          overheadCost: String(parseFloat(row['Overhead Cost']) || 0),
+          totalCost: String(parseFloat(row['Total Cost'])),
           notes: 'Imported from Excel',
         });
 

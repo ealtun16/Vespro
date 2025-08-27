@@ -157,7 +157,7 @@ export default function Reports() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Available Reports</p>
                 <p className="text-2xl font-bold text-foreground" data-testid="text-available-reports">
-                  {stats?.totalReports || 0}
+                  {(stats as any)?.totalReports || 0}
                 </p>
               </div>
             </div>
@@ -175,7 +175,7 @@ export default function Reports() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Exports This Month</p>
                 <p className="text-2xl font-bold text-foreground" data-testid="text-monthly-exports">
-                  {stats?.monthlyReports || 0}
+                  {(stats as any)?.monthlyReports || 0}
                 </p>
               </div>
             </div>

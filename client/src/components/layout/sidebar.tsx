@@ -30,19 +30,18 @@ export default function Sidebar() {
               const isActive = location === item.href;
               return (
                 <li key={item.href}>
-                  <Link href={item.href}>
-                    <a
-                      className={cn(
-                        "nav-item flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                        isActive
-                          ? "nav-item-active bg-sidebar-primary text-sidebar-primary-foreground"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      )}
-                      data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
-                    >
-                      <item.icon className="mr-3 h-4 w-4" />
-                      {item.label}
-                    </a>
+                  <Link 
+                    href={item.href}
+                    className={cn(
+                      "nav-item flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                      isActive
+                        ? "nav-item-active bg-sidebar-primary text-sidebar-primary-foreground"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    )}
+                    data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
+                  >
+                    <item.icon className="mr-3 h-4 w-4" />
+                    {item.label}
                   </Link>
                 </li>
               );

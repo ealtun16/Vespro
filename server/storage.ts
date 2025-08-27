@@ -93,7 +93,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTankSpecification(id: string): Promise<boolean> {
     const result = await db.delete(tankSpecifications).where(eq(tankSpecifications.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   async getAllCostAnalyses(page = 1, limit = 10, search = '', tankType = ''): Promise<{ analyses: CostAnalysis[], total: number }> {
@@ -178,7 +178,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCostAnalysis(id: string): Promise<boolean> {
     const result = await db.delete(costAnalyses).where(eq(costAnalyses.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   async getAllMaterials(): Promise<Material[]> {

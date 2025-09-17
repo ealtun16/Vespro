@@ -4,6 +4,13 @@ import {
   costAnalyses,
   materials,
   costAnalysisMaterials,
+  // Vespro schema
+  vespro_forms,
+  vespro_cost_items,
+  vespro_materials,
+  v_cost_analysis_list,
+  v_cost_analysis_materials,
+  v_dashboard_stats,
   type User, 
   type InsertUser,
   type TankSpecification,
@@ -13,7 +20,12 @@ import {
   type Material,
   type InsertMaterial,
   type CostAnalysisMaterial,
-  type InsertCostAnalysisMaterial
+  type InsertCostAnalysisMaterial,
+  // Vespro types
+  type VesproForm,
+  type InsertVesproForm,
+  type VesproCostItem,
+  type InsertVesproCostItem
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, and, or, sql } from "drizzle-orm";
@@ -31,7 +43,7 @@ export interface IStorage {
   updateTankSpecification(id: string, spec: Partial<InsertTankSpecification>): Promise<TankSpecification | undefined>;
   deleteTankSpecification(id: string): Promise<boolean>;
 
-  // Cost Analysis methods
+  // Cost Analysis methods (now using vespro compatibility views)
   getAllCostAnalyses(page?: number, limit?: number, search?: string, tankType?: string): Promise<{ analyses: CostAnalysis[], total: number }>;
   getCostAnalysis(id: string): Promise<CostAnalysis | undefined>;
   getCostAnalysisWithDetails(id: string): Promise<any>;
@@ -47,6 +59,10 @@ export interface IStorage {
   // Cost Analysis Material methods
   createCostAnalysisMaterial(cam: InsertCostAnalysisMaterial): Promise<CostAnalysisMaterial>;
   getCostAnalysisMaterials(costAnalysisId: string): Promise<any[]>;
+
+  // Vespro methods for Excel import
+  createVesproForm(form: InsertVesproForm): Promise<VesproForm>;
+  createVesproCostItems(items: InsertVesproCostItem[]): Promise<VesproCostItem[]>;
 
   // Dashboard stats
   getDashboardStats(): Promise<any>;
@@ -220,7 +236,30 @@ export class DatabaseStorage implements IStorage {
       .where(eq(costAnalysisMaterials.costAnalysisId, costAnalysisId));
   }
 
+  // Vespro methods for Excel import
+  async createVesproForm(form: InsertVesproForm): Promise<VesproForm> {
+    const [newForm] = await db.insert(vespro_forms).values(form).returning();
+    return newForm;
+  }
+
+  async createVesproCostItems(items: InsertVesproCostItem[]): Promise<VesproCostItem[]> {
+    if (items.length === 0) return [];
+    const newItems = await db.insert(vespro_cost_items).values(items).returning();
+    return newItems;
+  }
+
   async getDashboardStats(): Promise<any> {
+    // Try to use vespro dashboard stats view, fallback to original if empty
+    try {
+      const [vesproStats] = await db.select().from(v_dashboard_stats).limit(1);
+      if (vesproStats && (vesproStats.totalReports || 0) > 0) {
+        return vesproStats;
+      }
+    } catch (error) {
+      console.log("Vespro dashboard stats not available, using original method");
+    }
+
+    // Fallback to original dashboard stats
     const [totalReports] = await db.select({ count: sql<number>`count(*)` }).from(costAnalyses);
     const [totalTankModels] = await db.select({ count: sql<number>`count(*)` }).from(tankSpecifications);
     

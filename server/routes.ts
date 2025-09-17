@@ -239,7 +239,7 @@ async function processExcelData(data: any[]): Promise<any[]> {
             capacity: parseInt(row['Capacity']) || 1000,
             height: parseInt(row['Height']) || 2000,
             material: row['Material'] || 'Steel',
-            thickness: parseFloat(row['Thickness']) || undefined,
+            thickness: row['Thickness'] ? String(parseFloat(row['Thickness'])) : undefined,
           });
         }
 

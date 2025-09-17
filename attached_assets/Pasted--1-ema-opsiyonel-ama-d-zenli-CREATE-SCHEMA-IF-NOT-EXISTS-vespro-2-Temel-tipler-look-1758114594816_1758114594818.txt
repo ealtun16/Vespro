@@ -1,0 +1,116 @@
+-- 1) Şema (opsiyonel ama düzenli)
+CREATE SCHEMA IF NOT EXISTS vespro;
+
+-- 2) Temel tipler / lookup'lar
+CREATE TYPE vespro.category_type AS ENUM ('ATOLYE_ISCILIK', 'DIS_TEDARIK');
+CREATE TYPE vespro.uom AS ENUM ('kg', 'adet', 'm', 'mm', 'm2', 'm3', 'set', 'pcs', 'other');
+
+-- 3) Form başlıkları
+CREATE TABLE IF NOT EXISTS vespro.forms (
+    form_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    form_code         TEXT,                 -- örn: 1788V01-EV1
+    client_name       TEXT,                 -- örn: EVATHERM
+    form_title        TEXT,                 -- "MALİYET ANALİZ FORMU" vb.
+    form_date         DATE,                 -- örn: 2023-11-15
+    revision_no       INTEGER DEFAULT 0,
+    currency          TEXT DEFAULT 'EUR',
+    notes             TEXT,
+    metadata          JSONB DEFAULT '{}'::jsonb,  -- esnek alanlar (örn. sayfa notları, hesaplama seçenekleri)
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 4) (Opsiyonel) Malzeme sözlüğü
+CREATE TABLE IF NOT EXISTS vespro.materials (
+    material_id       BIGSERIAL PRIMARY KEY,
+    quality           TEXT,      -- örn: 1.4410
+    type              TEXT,      -- örn: SAÇ
+    UNIQUE (quality, type)
+);
+
+-- 5) (Opsiyonel) Form içi grup başlıkları
+CREATE TABLE IF NOT EXISTS vespro.cost_groups (
+    group_id          BIGSERIAL PRIMARY KEY,
+    form_id           UUID NOT NULL REFERENCES vespro.forms(form_id) ON DELETE CASCADE,
+    group_no          INTEGER NOT NULL,     -- Excel'deki "GRUP NO"
+    group_name        TEXT,                 -- örn: GÖVDE
+    UNIQUE (form_id, group_no)
+);
+
+-- 6) Satır kalemleri
+CREATE TABLE IF NOT EXISTS vespro.cost_items (
+    item_id           BIGSERIAL PRIMARY KEY,
+    form_id           UUID NOT NULL REFERENCES vespro.forms(form_id) ON DELETE CASCADE,
+
+    group_no          INTEGER,              -- "GRUP NO"
+    seq_no            INTEGER,              -- "SIRA NO"
+    cost_factor       TEXT,                 -- "MALİYET FAKTÖRÜ" (örn: GÖVDE, GÖVDE-KONİK, İÇ PARÇALAR)
+
+    material_id       BIGINT REFERENCES vespro.materials(material_id),
+    material_quality  TEXT,                 -- hızlı kullanım için tekrar da tutuyoruz
+    material_type     TEXT,
+
+    -- Ebatlar (Excel başlık: EBAT, alt başlıklar mm/mm/mm-kg/kg-m gibi sütunlara yayılmış)
+    dim_a_mm          NUMERIC,              -- örn: 1500
+    dim_b_mm          NUMERIC,              -- örn: 7500
+    dim_c_thickness_mm NUMERIC,             -- örn: 6 (kalınlık)
+    mass_per_unit_kg  NUMERIC,              -- örn: 540 (parça başına kg) veya kg/m gibi; yanında unit açıklayın
+    mass_per_unit_note TEXT,                -- "kg/m" gibi not
+
+    quantity          NUMERIC,              -- "ADET"
+    total_qty         NUMERIC,              -- "TOPLAM MİKTAR" (genelde kg)
+    qty_uom           vespro.uom,           -- "BİRİM" (genelde kg)
+
+    unit_price_eur    NUMERIC,              -- "BİRİM FİYAT EURO" (örn: €/kg)
+    total_price_eur   NUMERIC,              -- "TOPLAM FİYAT EURO"
+
+    material_status   TEXT,                 -- "Malzemenin Durumu" (ör: YOK, STOK vb.)
+
+    -- Kategori dağılımları (formda iki kolon seti var: Atölye İşçilik & Dış Tedarik)
+    cat1_flag         BOOLEAN,              -- ATÖLYE İşçilik seti için (Excel’de 1/0 görülüyor)
+    cat1_type         vespro.category_type, -- genelde 'ATOLYE_ISCILIK'
+    cat1_amount_eur   NUMERIC,              -- bu kalemin atölye işçilik € karşılığı (varsa)
+
+    cat2_flag         BOOLEAN,              -- DIŞ TEDARİK seti için (Excel’de 1/0)
+    cat2_type         vespro.category_type, -- genelde 'DIS_TEDARIK'
+    cat2_amount_eur   NUMERIC,              -- bu kalemin dış tedarik € karşılığı (varsa)
+
+    extra             JSONB DEFAULT '{}'::jsonb, -- gerekirse satıra özgü ek alanlar
+    CONSTRAINT fk_cost_items_form CHECK (unit_price_eur IS NULL OR unit_price_eur >= 0)
+);
+
+-- 7) İndeksler (dashboard performansı için)
+CREATE INDEX IF NOT EXISTS idx_forms_code     ON vespro.forms(form_code);
+CREATE INDEX IF NOT EXISTS idx_items_form     ON vespro.cost_items(form_id);
+CREATE INDEX IF NOT EXISTS idx_items_groupseq ON vespro.cost_items(form_id, group_no, seq_no);
+
+-- 8) Özet görünümler (dashboard beslemek için)
+-- Form bazında toplamlar
+CREATE OR REPLACE VIEW vespro.v_form_totals AS
+SELECT
+  f.form_id,
+  f.form_code,
+  f.client_name,
+  COALESCE(SUM(ci.total_qty) FILTER (WHERE ci.qty_uom = 'kg'), 0)              AS total_weight_kg,
+  COALESCE(SUM(ci.total_price_eur), 0)                                          AS total_cost_eur,
+  COALESCE(SUM(ci.cat1_amount_eur), 0)                                          AS total_atolye_iscilik_eur,
+  COALESCE(SUM(ci.cat2_amount_eur), 0)                                          AS total_dis_tedarik_eur,
+  COALESCE(SUM(ci.total_price_eur) 
+           - (COALESCE(SUM(ci.cat1_amount_eur),0) + COALESCE(SUM(ci.cat2_amount_eur),0)), 0)
+                                                                                AS material_only_eur
+FROM vespro.forms f
+LEFT JOIN vespro.cost_items ci ON ci.form_id = f.form_id
+GROUP BY 1,2,3;
+
+-- Malzeme kalitesi / tipi kırılımı
+CREATE OR REPLACE VIEW vespro.v_form_material_breakdown AS
+SELECT
+  f.form_id,
+  ci.material_quality,
+  ci.material_type,
+  COALESCE(SUM(ci.total_qty),0)        AS sum_qty,
+  MAX(ci.qty_uom)                      AS qty_uom,
+  COALESCE(SUM(ci.total_price_eur),0)  AS sum_cost_eur
+FROM vespro.forms f
+JOIN vespro.cost_items ci ON ci.form_id = f.form_id
+GROUP BY 1,2,3
+ORDER BY f.form_id, material_quality, material_type;

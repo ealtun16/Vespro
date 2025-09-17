@@ -1,8 +1,108 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, pgEnum, pgView, text, varchar, decimal, integer, timestamp, jsonb, uuid, bigserial, boolean, numeric, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Vespro schema
+export const vespro = pgSchema("vespro");
+
+// Vespro enums (schema-qualified)
+export const categoryType = vespro.enum("category_type", ["ATOLYE_ISCILIK", "DIS_TEDARIK"]);
+export const uom = vespro.enum("uom", ["kg", "adet", "m", "mm", "m2", "m3", "set", "pcs", "other"]);
+
+// Vespro tables
+export const vespro_forms = vespro.table("forms", {
+  form_id: uuid("form_id").primaryKey().default(sql`gen_random_uuid()`),
+  form_code: text("form_code"),
+  client_name: text("client_name"),
+  form_title: text("form_title"),
+  form_date: date("form_date"),
+  revision_no: integer("revision_no").default(0),
+  currency: text("currency").default("EUR"),
+  notes: text("notes"),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const vespro_materials = vespro.table("materials", {
+  material_id: bigserial("material_id", { mode: "bigint" }).primaryKey(),
+  quality: text("quality"),
+  type: text("type"),
+});
+
+export const vespro_cost_groups = vespro.table("cost_groups", {
+  group_id: bigserial("group_id", { mode: "bigint" }).primaryKey(),
+  form_id: uuid("form_id").notNull().references(() => vespro_forms.form_id, { onDelete: "cascade" }),
+  group_no: integer("group_no").notNull(),
+  group_name: text("group_name"),
+});
+
+export const vespro_cost_items = vespro.table("cost_items", {
+  item_id: bigserial("item_id", { mode: "bigint" }).primaryKey(),
+  form_id: uuid("form_id").notNull().references(() => vespro_forms.form_id, { onDelete: "cascade" }),
+  group_no: integer("group_no"),
+  seq_no: integer("seq_no"),
+  cost_factor: text("cost_factor"),
+  material_id: bigserial("material_id", { mode: "bigint" }).references(() => vespro_materials.material_id),
+  material_quality: text("material_quality"),
+  material_type: text("material_type"),
+  dim_a_mm: numeric("dim_a_mm"),
+  dim_b_mm: numeric("dim_b_mm"),
+  dim_c_thickness_mm: numeric("dim_c_thickness_mm"),
+  mass_per_unit_kg: numeric("mass_per_unit_kg"),
+  mass_per_unit_note: text("mass_per_unit_note"),
+  quantity: numeric("quantity"),
+  total_qty: numeric("total_qty"),
+  qty_uom: uom("qty_uom"),
+  unit_price_eur: numeric("unit_price_eur"),
+  total_price_eur: numeric("total_price_eur"),
+  material_status: text("material_status"),
+  cat1_flag: boolean("cat1_flag"),
+  cat1_type: categoryType("cat1_type"),
+  cat1_amount_eur: numeric("cat1_amount_eur"),
+  cat2_flag: boolean("cat2_flag"),
+  cat2_type: categoryType("cat2_type"),
+  cat2_amount_eur: numeric("cat2_amount_eur"),
+  extra: jsonb("extra").default(sql`'{}'::jsonb`),
+});
+
+// Compatibility views (referencing existing views in vespro schema)
+export const v_cost_analysis_list = vespro.view("v_cost_analysis_list", {
+  id: text("id"),
+  reportId: text("reportId"),
+  materialCost: text("materialCost"),
+  laborCost: text("laborCost"),
+  overheadCost: text("overheadCost"),
+  totalCost: text("totalCost"),
+  currency: text("currency"),
+  analysisDate: timestamp("analysisDate"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt"),
+  updatedAt: timestamp("updatedAt"),
+  tankName: text("tankName"),
+  tankType: text("tankType"),
+  capacity: integer("capacity"),
+  height: integer("height"),
+  tankSpecificationId: text("tankSpecificationId"),
+}).existing();
+
+export const v_cost_analysis_materials = vespro.view("v_cost_analysis_materials", {
+  id: text("id"),
+  costAnalysisId: text("costAnalysisId"),
+  materialId: text("materialId"),
+  quantity: numeric("quantity"),
+  totalCost: numeric("totalCost"),
+  material: jsonb("material"),
+}).existing();
+
+export const v_dashboard_stats = vespro.view("v_dashboard_stats", {
+  totalReports: integer("totalReports"),
+  tankModels: integer("tankModels"),
+  averageCost: integer("averageCost"),
+  monthlyReports: integer("monthlyReports"),
+}).existing();
+
+// Original tables (keeping for backward compatibility)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
@@ -117,3 +217,28 @@ export type Material = typeof materials.$inferSelect;
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
 export type CostAnalysisMaterial = typeof costAnalysisMaterials.$inferSelect;
 export type InsertCostAnalysisMaterial = z.infer<typeof insertCostAnalysisMaterialSchema>;
+
+// Vespro insert schemas
+export const insertVesproFormSchema = createInsertSchema(vespro_forms).omit({ 
+  form_id: true, 
+  created_at: true 
+});
+export const insertVesproMaterialSchema = createInsertSchema(vespro_materials).omit({ 
+  material_id: true 
+});
+export const insertVesproCostGroupSchema = createInsertSchema(vespro_cost_groups).omit({ 
+  group_id: true 
+});
+export const insertVesproCostItemSchema = createInsertSchema(vespro_cost_items).omit({ 
+  item_id: true 
+});
+
+// Vespro types
+export type VesproForm = typeof vespro_forms.$inferSelect;
+export type InsertVesproForm = z.infer<typeof insertVesproFormSchema>;
+export type VesproMaterial = typeof vespro_materials.$inferSelect;
+export type InsertVesproMaterial = z.infer<typeof insertVesproMaterialSchema>;
+export type VesproCostGroup = typeof vespro_cost_groups.$inferSelect;
+export type InsertVesproCostGroup = z.infer<typeof insertVesproCostGroupSchema>;
+export type VesproCostItem = typeof vespro_cost_items.$inferSelect;
+export type InsertVesproCostItem = z.infer<typeof insertVesproCostItemSchema>;

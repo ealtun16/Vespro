@@ -8,7 +8,7 @@ export const vespro = pgSchema("vespro");
 
 // Vespro enums (schema-qualified)
 export const categoryType = vespro.enum("category_type", ["ATOLYE_ISCILIK", "DIS_TEDARIK"]);
-export const uom = vespro.enum("uom", ["kg", "adet", "m", "mm", "m2", "m3", "set", "pcs", "ton", "lt", "piece", "other"]);
+export const uom = vespro.enum("uom", ["kg", "adet", "m", "mm", "m2", "m3", "set", "ton", "lt", "other"]);
 
 // Vespro tables
 export const vespro_forms = vespro.table("forms", {

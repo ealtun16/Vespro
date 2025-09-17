@@ -118,38 +118,24 @@ export class DatabaseStorage implements IStorage {
     let whereClause = sql`1 = 1`;
     
     if (search) {
-      whereClause = sql`${whereClause} AND ${costAnalyses.reportId} ILIKE ${'%' + search + '%'}`;
+      whereClause = sql`${whereClause} AND ${v_cost_analysis_list.reportId} ILIKE ${'%' + search + '%'}`;
     }
     
     if (tankType && tankType !== 'all') {
-      whereClause = sql`${whereClause} AND ${tankSpecifications.type} = ${tankType}`;
+      whereClause = sql`${whereClause} AND ${v_cost_analysis_list.tankType} = ${tankType}`;
     }
 
     const analyses = await db
-      .select({
-        id: costAnalyses.id,
-        reportId: costAnalyses.reportId,
-        materialCost: costAnalyses.materialCost,
-        laborCost: costAnalyses.laborCost,
-        overheadCost: costAnalyses.overheadCost,
-        totalCost: costAnalyses.totalCost,
-        analysisDate: costAnalyses.analysisDate,
-        tankType: tankSpecifications.type,
-        tankName: tankSpecifications.name,
-        capacity: tankSpecifications.capacity,
-        height: tankSpecifications.height,
-      })
-      .from(costAnalyses)
-      .leftJoin(tankSpecifications, eq(costAnalyses.tankSpecificationId, tankSpecifications.id))
+      .select()
+      .from(v_cost_analysis_list)
       .where(whereClause)
-      .orderBy(desc(costAnalyses.analysisDate))
+      .orderBy(desc(v_cost_analysis_list.analysisDate))
       .limit(limit)
       .offset(offset);
 
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)` })
-      .from(costAnalyses)
-      .leftJoin(tankSpecifications, eq(costAnalyses.tankSpecificationId, tankSpecifications.id))
+      .from(v_cost_analysis_list)
       .where(whereClause);
 
     return { analyses: analyses as any[], total: count };
@@ -161,6 +147,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCostAnalysisWithDetails(id: string): Promise<any> {
+    // Try to get from vespro views first, fallback to legacy if not found
+    try {
+      const [analysis] = await db
+        .select()
+        .from(v_cost_analysis_list)
+        .where(eq(v_cost_analysis_list.id, id));
+
+      if (analysis) {
+        // Get materials from vespro view
+        const materials = await db
+          .select()
+          .from(v_cost_analysis_materials)
+          .where(eq(v_cost_analysis_materials.costAnalysisId, id));
+
+        return {
+          ...analysis,
+          materials,
+        };
+      }
+    } catch (error) {
+      console.log("Vespro cost analysis details not available, using legacy method");
+    }
+
+    // Fallback to legacy method
     const [analysis] = await db
       .select()
       .from(costAnalyses)

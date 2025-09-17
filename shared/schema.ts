@@ -69,37 +69,37 @@ export const vespro_cost_items = vespro.table("cost_items", {
 // Compatibility views (referencing existing views in vespro schema)
 export const v_cost_analysis_list = vespro.view("v_cost_analysis_list", {
   id: text("id"),
-  reportId: text("reportId"),
-  materialCost: text("materialCost"),
-  laborCost: text("laborCost"),
-  overheadCost: text("overheadCost"),
-  totalCost: text("totalCost"),
+  reportId: text("reportid"),
+  materialCost: text("materialcost"),
+  laborCost: text("laborcost"),
+  overheadCost: text("overheadcost"),
+  totalCost: text("totalcost"),
   currency: text("currency"),
-  analysisDate: timestamp("analysisDate"),
+  analysisDate: timestamp("analysisdate"),
   notes: text("notes"),
-  createdAt: timestamp("createdAt"),
-  updatedAt: timestamp("updatedAt"),
-  tankName: text("tankName"),
-  tankType: text("tankType"),
+  createdAt: timestamp("createdat"),
+  updatedAt: timestamp("updatedat"),
+  tankName: text("tankname"),
+  tankType: text("tanktype"),
   capacity: integer("capacity"),
   height: integer("height"),
-  tankSpecificationId: text("tankSpecificationId"),
+  tankSpecificationId: text("tankspecificationid"),
 }).existing();
 
 export const v_cost_analysis_materials = vespro.view("v_cost_analysis_materials", {
   id: text("id"),
-  costAnalysisId: text("costAnalysisId"),
-  materialId: text("materialId"),
+  costAnalysisId: text("costanalysisid"),
+  materialId: text("materialid"),
   quantity: numeric("quantity"),
-  totalCost: numeric("totalCost"),
+  totalCost: numeric("totalcost"),
   material: jsonb("material"),
 }).existing();
 
 export const v_dashboard_stats = vespro.view("v_dashboard_stats", {
-  totalReports: integer("totalReports"),
-  tankModels: integer("tankModels"),
-  averageCost: integer("averageCost"),
-  monthlyReports: integer("monthlyReports"),
+  totalReports: integer("totalreports"),
+  tankModels: integer("tankmodels"),
+  averageCost: integer("averagecost"),
+  monthlyReports: integer("monthlyreports"),
 }).existing();
 
 // Original tables (keeping for backward compatibility)

@@ -228,33 +228,77 @@ async function processExcelData(data: any[]): Promise<any[]> {
   
   for (const row of data) {
     try {
-      // This is a basic example - you would customize based on your Excel structure
+      // Process data to vespro schema format
       if (row['Tank Type'] && row['Total Cost']) {
-        // First create or find tank specification
-        let tankSpec;
-        if (row['Tank Name']) {
-          tankSpec = await storage.createTankSpecification({
-            name: row['Tank Name'] || 'Imported Tank',
-            type: row['Tank Type'],
-            capacity: parseInt(row['Capacity']) || 1000,
-            height: parseInt(row['Height']) || 2000,
-            material: row['Material'] || 'Steel',
-            thickness: row['Thickness'] ? String(parseFloat(row['Thickness'])) : undefined,
+        // Create a vespro form for this import
+        const vesproForm = await storage.createVesproForm({
+          form_code: row['Report ID'] || `IMP-${Date.now()}`,
+          client_name: row['Client'] || 'Imported Client',
+          form_title: `${row['Tank Type']} - ${row['Tank Name'] || 'Imported Tank'}`,
+          form_date: new Date().toISOString().split('T')[0],
+          revision_no: 0,
+          currency: 'EUR',
+          notes: 'Imported from Excel',
+          metadata: {
+            originalRow: row,
+            importDate: new Date().toISOString(),
+          },
+        });
+
+        // Create cost items for the form
+        const costItems = [];
+        
+        // Material cost item
+        if (row['Material Cost'] && parseFloat(row['Material Cost']) > 0) {
+          costItems.push({
+            form_id: vesproForm.form_id,
+            group_no: 1,
+            seq_no: 1,
+            cost_factor: 'Material Cost',
+            material_quality: row['Material'] || 'Steel',
+            quantity: '1',
+            total_qty: '1',
+            qty_uom: 'kg' as const,
+            unit_price_eur: String(parseFloat(row['Material Cost'])),
+            total_price_eur: String(parseFloat(row['Material Cost'])),
           });
         }
 
-        // Create cost analysis
-        const costAnalysis = await storage.createCostAnalysis({
-          reportId: row['Report ID'] || `IMP-${Date.now()}`,
-          tankSpecificationId: tankSpec?.id,
-          materialCost: String(parseFloat(row['Material Cost']) || 0),
-          laborCost: String(parseFloat(row['Labor Cost']) || 0),
-          overheadCost: String(parseFloat(row['Overhead Cost']) || 0),
-          totalCost: String(parseFloat(row['Total Cost'])),
-          notes: 'Imported from Excel',
-        });
+        // Labor cost item
+        if (row['Labor Cost'] && parseFloat(row['Labor Cost']) > 0) {
+          costItems.push({
+            form_id: vesproForm.form_id,
+            group_no: 2,
+            seq_no: 1,
+            cost_factor: 'Labor Cost',
+            quantity: '1',
+            total_qty: '1',
+            qty_uom: 'other' as const,
+            unit_price_eur: String(parseFloat(row['Labor Cost'])),
+            total_price_eur: String(parseFloat(row['Labor Cost'])),
+          });
+        }
 
-        processed.push(costAnalysis);
+        // Overhead cost item
+        if (row['Overhead Cost'] && parseFloat(row['Overhead Cost']) > 0) {
+          costItems.push({
+            form_id: vesproForm.form_id,
+            group_no: 3,
+            seq_no: 1,
+            cost_factor: 'Overhead Cost',
+            quantity: '1',
+            total_qty: '1',
+            qty_uom: 'other' as const,
+            unit_price_eur: String(parseFloat(row['Overhead Cost'])),
+            total_price_eur: String(parseFloat(row['Overhead Cost'])),
+          });
+        }
+
+        if (costItems.length > 0) {
+          await storage.createVesproCostItems(costItems);
+        }
+
+        processed.push(vesproForm);
       }
     } catch (error) {
       console.error('Error processing row:', row, error);

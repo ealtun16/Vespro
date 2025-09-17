@@ -160,6 +160,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vespro Forms routes (for imported Excel data)
+  app.get("/api/vespro-forms", async (req, res) => {
+    try {
+      const forms = await storage.getAllVesproForms();
+      res.json(forms);
+    } catch (error) {
+      console.error("Error fetching vespro forms:", error);
+      res.status(500).json({ message: "Failed to fetch imported forms" });
+    }
+  });
+
+  app.get("/api/vespro-forms/:id", async (req, res) => {
+    try {
+      const form = await storage.getVesproForm(req.params.id);
+      if (!form) {
+        return res.status(404).json({ message: "Form not found" });
+      }
+      res.json(form);
+    } catch (error) {
+      console.error("Error fetching vespro form:", error);
+      res.status(500).json({ message: "Failed to fetch form" });
+    }
+  });
+
+  app.get("/api/vespro-forms/:id/cost-items", async (req, res) => {
+    try {
+      const costItems = await storage.getVesproFormCostItems(req.params.id);
+      res.json(costItems);
+    } catch (error) {
+      console.error("Error fetching form cost items:", error);
+      res.status(500).json({ message: "Failed to fetch cost items" });
+    }
+  });
+
   // Excel Import route
   app.post("/api/import/excel", upload.single('file'), async (req: MulterRequest, res) => {
     try {
@@ -224,7 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 }
 
 async function processExcelData(data: any[]): Promise<any[]> {
-  const processed = [];
+  const processed: any[] = [];
   
   // Handle Turkish Excel structure
   const rawData = data as any[];
@@ -254,8 +288,8 @@ async function processExcelData(data: any[]): Promise<any[]> {
       currency: 'EUR',
       tank_name: String(tankName),
       tank_type: String(tankType),
-      tank_width_mm: tankWidth ? String(tankWidth) : null,
-      tank_height_mm: tankHeight ? String(tankHeight) : null,
+      tank_width_mm: tankWidth && !isNaN(Number(tankWidth)) ? String(tankWidth) : null,
+      tank_height_mm: tankHeight && !isNaN(Number(tankHeight)) ? String(tankHeight) : null,
       tank_material_grade: materialGrade ? String(materialGrade) : null,
       notes: 'Imported from Excel',
       metadata: {
@@ -303,9 +337,9 @@ async function processExcelData(data: any[]): Promise<any[]> {
           cost_factor: String(maliyetFaktoru),
           material_quality: malzemeKalitesi ? String(malzemeKalitesi) : null,
           material_type: malzemeTipi ? String(malzemeTipi) : null,
-          dim_a_mm: ebatA ? String(ebatA) : null,
-          dim_b_mm: ebatB ? String(ebatB) : null,
-          dim_c_thickness_mm: ebatC ? String(ebatC) : null,
+          dim_a_mm: ebatA && !isNaN(Number(ebatA)) ? String(ebatA) : null,
+          dim_b_mm: ebatB && !isNaN(Number(ebatB)) ? String(ebatB) : null,
+          dim_c_thickness_mm: ebatC && !isNaN(Number(ebatC)) ? String(ebatC) : null,
           quantity: adet ? String(adet) : '1',
           total_qty: toplamMiktar ? String(toplamMiktar) : String(adet || 1),
           qty_uom: birim ? String(birim) : 'kg',

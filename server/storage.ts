@@ -63,6 +63,9 @@ export interface IStorage {
   // Vespro methods for Excel import
   createVesproForm(form: InsertVesproForm): Promise<VesproForm>;
   createVesproCostItems(items: InsertVesproCostItem[]): Promise<VesproCostItem[]>;
+  getAllVesproForms(): Promise<VesproForm[]>;
+  getVesproForm(id: string): Promise<VesproForm | undefined>;
+  getVesproFormCostItems(formId: string): Promise<VesproCostItem[]>;
 
   // Dashboard stats
   getDashboardStats(): Promise<any>;
@@ -256,6 +259,19 @@ export class DatabaseStorage implements IStorage {
     if (items.length === 0) return [];
     const newItems = await db.insert(vespro_cost_items).values(items).returning();
     return newItems;
+  }
+
+  async getAllVesproForms(): Promise<VesproForm[]> {
+    return await db.select().from(vespro_forms).orderBy(desc(vespro_forms.created_at));
+  }
+
+  async getVesproForm(id: string): Promise<VesproForm | undefined> {
+    const [form] = await db.select().from(vespro_forms).where(eq(vespro_forms.form_id, id));
+    return form || undefined;
+  }
+
+  async getVesproFormCostItems(formId: string): Promise<VesproCostItem[]> {
+    return await db.select().from(vespro_cost_items).where(eq(vespro_cost_items.form_id, formId));
   }
 
   async getDashboardStats(): Promise<any> {

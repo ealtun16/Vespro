@@ -8,7 +8,7 @@ export const vespro = pgSchema("vespro");
 
 // Vespro enums (schema-qualified)
 export const categoryType = vespro.enum("category_type", ["ATOLYE_ISCILIK", "DIS_TEDARIK"]);
-export const uom = vespro.enum("uom", ["kg", "adet", "m", "mm", "m2", "m3", "set", "pcs", "other"]);
+export const uom = vespro.enum("uom", ["kg", "adet", "m", "mm", "m2", "m3", "set", "pcs", "ton", "lt", "piece", "other"]);
 
 // Vespro tables
 export const vespro_forms = vespro.table("forms", {
@@ -19,6 +19,22 @@ export const vespro_forms = vespro.table("forms", {
   form_date: date("form_date"),
   revision_no: integer("revision_no").default(0),
   currency: text("currency").default("EUR"),
+  // Tank specifications from Excel header
+  tank_name: text("tank_name"),
+  tank_type: text("tank_type"),
+  tank_width_mm: numeric("tank_width_mm"),
+  tank_height_mm: numeric("tank_height_mm"),
+  tank_diameter_mm: numeric("tank_diameter_mm"),
+  tank_volume: numeric("tank_volume"),
+  tank_surface_area: numeric("tank_surface_area"),
+  tank_material_type: text("tank_material_type"), // e.g., "EVATHERM"
+  tank_material_grade: text("tank_material_grade"), // e.g., "super duplex-1.4410"
+  operating_pressure: text("operating_pressure"), // e.g., "0 BAR"
+  operating_temperature: text("operating_temperature"), // e.g., "SICAKLIK"
+  // Additional Excel fields
+  drawing_revision: text("drawing_revision"),
+  project_status: text("project_status"),
+  calculated_values: jsonb("calculated_values").default(sql`'{}'::jsonb`),
   notes: text("notes"),
   metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

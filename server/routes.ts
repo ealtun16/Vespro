@@ -226,83 +226,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
 async function processExcelData(data: any[]): Promise<any[]> {
   const processed = [];
   
-  for (const row of data) {
-    try {
-      // Process data to vespro schema format
-      if (row['Tank Type'] && row['Total Cost']) {
-        // Create a vespro form for this import
-        const vesproForm = await storage.createVesproForm({
-          form_code: row['Report ID'] || `IMP-${Date.now()}`,
-          client_name: row['Client'] || 'Imported Client',
-          form_title: `${row['Tank Type']} - ${row['Tank Name'] || 'Imported Tank'}`,
-          form_date: new Date().toISOString().split('T')[0],
-          revision_no: 0,
-          currency: 'EUR',
-          notes: 'Imported from Excel',
-          metadata: {
-            originalRow: row,
-            importDate: new Date().toISOString(),
-          },
+  // Handle Turkish Excel structure
+  const rawData = data as any[];
+  
+  if (rawData.length < 8) {
+    console.log('Excel file too short, expected at least 8 rows');
+    return processed;
+  }
+
+  try {
+    // Extract header information from Excel (rows 1-3)
+    const formTitle = rawData[0]?.__EMPTY_2 || rawData[0]?.[2] || 'MALİYET ANALİZ FORMU';
+    const formCode = rawData[1]?.__EMPTY_2 || rawData[1]?.[2] || `IMP-${Date.now()}`;
+    const tankName = rawData[1]?.__EMPTY_5 || rawData[1]?.[5] || 'Imported Tank';
+    const tankWidth = rawData[1]?.__EMPTY_7 || rawData[1]?.[7];
+    const tankHeight = rawData[1]?.__EMPTY_9 || rawData[1]?.[9];
+    const tankType = rawData[2]?.__EMPTY_2 || rawData[2]?.[2] || 'Imported Type';
+    const materialGrade = rawData[2]?.__EMPTY_6 || rawData[2]?.[6];
+
+    // Create a vespro form for this import
+    const vesproForm = await storage.createVesproForm({
+      form_code: String(formCode),
+      client_name: 'Excel Import',
+      form_title: String(formTitle),
+      form_date: new Date().toISOString().split('T')[0],
+      revision_no: 0,
+      currency: 'EUR',
+      tank_name: String(tankName),
+      tank_type: String(tankType),
+      tank_width_mm: tankWidth ? String(tankWidth) : null,
+      tank_height_mm: tankHeight ? String(tankHeight) : null,
+      tank_material_grade: materialGrade ? String(materialGrade) : null,
+      notes: 'Imported from Excel',
+      metadata: {
+        importDate: new Date().toISOString(),
+        originalData: {
+          formTitle,
+          formCode,
+          tankName,
+          tankWidth,
+          tankHeight,
+          tankType,
+          materialGrade
+        }
+      },
+    });
+
+    // Process cost items starting from row 8 (index 7)
+    const costItems = [];
+    
+    for (let i = 7; i < rawData.length; i++) {
+      const row = rawData[i];
+      if (!row) continue;
+
+      // Extract data from Turkish Excel columns
+      const grupNo = row.__EMPTY || row[0];
+      const siraNo = row.__EMPTY_1 || row[1];
+      const maliyetFaktoru = row.__EMPTY_2 || row[2];
+      const malzemeKalitesi = row.__EMPTY_3 || row[3];
+      const malzemeTipi = row.__EMPTY_4 || row[4];
+      const ebatA = row.__EMPTY_5 || row[5];
+      const ebatB = row.__EMPTY_6 || row[6];
+      const ebatC = row.__EMPTY_7 || row[7];
+      const adet = row.__EMPTY_9 || row[9];
+      const toplamMiktar = row.__EMPTY_10 || row[10];
+      const birim = row.__EMPTY_11 || row[11];
+      const birimFiyat = row.__EMPTY_12 || row[12];
+      const toplamFiyat = row.__EMPTY_13 || row[13];
+
+      // Only process rows with meaningful data
+      if (maliyetFaktoru && birimFiyat && parseFloat(String(birimFiyat)) > 0) {
+        costItems.push({
+          form_id: vesproForm.form_id,
+          group_no: grupNo ? parseInt(String(grupNo)) : 1,
+          seq_no: siraNo ? parseInt(String(siraNo)) : costItems.length + 1,
+          cost_factor: String(maliyetFaktoru),
+          material_quality: malzemeKalitesi ? String(malzemeKalitesi) : null,
+          material_type: malzemeTipi ? String(malzemeTipi) : null,
+          dim_a_mm: ebatA ? String(ebatA) : null,
+          dim_b_mm: ebatB ? String(ebatB) : null,
+          dim_c_thickness_mm: ebatC ? String(ebatC) : null,
+          quantity: adet ? String(adet) : '1',
+          total_qty: toplamMiktar ? String(toplamMiktar) : String(adet || 1),
+          qty_uom: birim ? String(birim) : 'kg',
+          unit_price_eur: String(birimFiyat),
+          total_price_eur: toplamFiyat ? String(toplamFiyat) : String(birimFiyat),
         });
-
-        // Create cost items for the form
-        const costItems = [];
-        
-        // Material cost item
-        if (row['Material Cost'] && parseFloat(row['Material Cost']) > 0) {
-          costItems.push({
-            form_id: vesproForm.form_id,
-            group_no: 1,
-            seq_no: 1,
-            cost_factor: 'Material Cost',
-            material_quality: row['Material'] || 'Steel',
-            quantity: '1',
-            total_qty: '1',
-            qty_uom: 'kg' as const,
-            unit_price_eur: String(parseFloat(row['Material Cost'])),
-            total_price_eur: String(parseFloat(row['Material Cost'])),
-          });
-        }
-
-        // Labor cost item
-        if (row['Labor Cost'] && parseFloat(row['Labor Cost']) > 0) {
-          costItems.push({
-            form_id: vesproForm.form_id,
-            group_no: 2,
-            seq_no: 1,
-            cost_factor: 'Labor Cost',
-            quantity: '1',
-            total_qty: '1',
-            qty_uom: 'other' as const,
-            unit_price_eur: String(parseFloat(row['Labor Cost'])),
-            total_price_eur: String(parseFloat(row['Labor Cost'])),
-          });
-        }
-
-        // Overhead cost item
-        if (row['Overhead Cost'] && parseFloat(row['Overhead Cost']) > 0) {
-          costItems.push({
-            form_id: vesproForm.form_id,
-            group_no: 3,
-            seq_no: 1,
-            cost_factor: 'Overhead Cost',
-            quantity: '1',
-            total_qty: '1',
-            qty_uom: 'other' as const,
-            unit_price_eur: String(parseFloat(row['Overhead Cost'])),
-            total_price_eur: String(parseFloat(row['Overhead Cost'])),
-          });
-        }
-
-        if (costItems.length > 0) {
-          await storage.createVesproCostItems(costItems);
-        }
-
-        processed.push(vesproForm);
       }
-    } catch (error) {
-      console.error('Error processing row:', row, error);
     }
+
+    // Save cost items if any
+    if (costItems.length > 0) {
+      await storage.createVesproCostItems(costItems);
+      console.log(`Created ${costItems.length} cost items for form ${vesproForm.form_id}`);
+    }
+
+    processed.push({
+      form: vesproForm,
+      costItems: costItems.length
+    });
+
+  } catch (error) {
+    console.error('Error processing Excel data:', error);
   }
   
   return processed;

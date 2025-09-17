@@ -1,14 +1,18 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, pgSchema, pgEnum, pgView, text, varchar, decimal, integer, timestamp, jsonb, uuid, bigserial, boolean, numeric, date } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, pgEnum, pgView, text, varchar, decimal, integer, timestamp, jsonb, uuid, bigserial, boolean, numeric, date, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Vespro schema
 export const vespro = pgSchema("vespro");
 
-// Vespro enums (schema-qualified)
-export const categoryType = vespro.enum("category_type", ["ATOLYE_ISCILIK", "DIS_TEDARIK"]);
-export const uom = vespro.enum("uom", ["kg", "adet", "m", "mm", "m2", "m3", "set", "ton", "lt", "other"]);
+// Reference existing vespro enums with customType (don't recreate them)
+const categoryType = customType<{ data: "ATOLYE_ISCILIK" | "DIS_TEDARIK"; driverData: string }>({ 
+  dataType: () => "vespro.category_type" 
+});
+const uom = customType<{ data: string; driverData: string }>({ 
+  dataType: () => "vespro.uom" 
+});
 
 // Vespro tables
 export const vespro_forms = vespro.table("forms", {

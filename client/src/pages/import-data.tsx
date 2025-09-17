@@ -1,9 +1,20 @@
 import FileUpload from "@/components/upload/file-upload";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Eye, FileText } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 
 export default function ImportData() {
+  const { data: vesproForms = [], isLoading, refetch } = useQuery({
+    queryKey: ['/api/vespro-forms'],
+    select: (data: any) => data || []
+  });
+
   return (
-    <div>
+    <div className="space-y-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground" data-testid="text-page-title">
           Import Data
@@ -13,7 +24,79 @@ export default function ImportData() {
         </p>
       </div>
 
-      <FileUpload />
+      <FileUpload onUploadSuccess={() => refetch()} />
+
+      {/* Imported Records Section */}
+      <Card className="card-shadow">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            İçe Aktarılan Kayıtlar
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+              <p className="mt-2 text-sm text-muted-foreground">Kayıtlar yükleniyor...</p>
+            </div>
+          ) : vesproForms && Array.isArray(vesproForms) && vesproForms.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Form Başlığı</TableHead>
+                    <TableHead>Tank Adı</TableHead>
+                    <TableHead>Tank Tipi</TableHead>
+                    <TableHead>Para Birimi</TableHead>
+                    <TableHead>İçe Aktarma Tarihi</TableHead>
+                    <TableHead>İşlemler</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {vesproForms.map((form: any) => (
+                    <TableRow key={form.form_id} data-testid={`row-vespro-form-${form.form_id}`}>
+                      <TableCell className="font-medium" data-testid={`text-form-title-${form.form_id}`}>
+                        {form.form_title}
+                      </TableCell>
+                      <TableCell data-testid={`text-tank-name-${form.form_id}`}>
+                        {form.tank_name || 'Belirtilmemiş'}
+                      </TableCell>
+                      <TableCell data-testid={`text-tank-type-${form.form_id}`}>
+                        {form.tank_type && (
+                          <Badge variant="outline">{form.tank_type}</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell data-testid={`text-currency-${form.form_id}`}>
+                        {form.currency}
+                      </TableCell>
+                      <TableCell data-testid={`text-import-date-${form.form_id}`}>
+                        {form.created_at && formatDistanceToNow(new Date(form.created_at), { addSuffix: true })}
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          data-testid={`button-view-${form.form_id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Görüntüle
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+              <p className="text-muted-foreground">Henüz kayıt yok</p>
+              <p className="text-sm text-muted-foreground">Excel dosyası yükleyerek başlayın</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="card-shadow">
         <CardContent className="p-6">

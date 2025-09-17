@@ -5,7 +5,11 @@ import { Upload, FileSpreadsheet, FolderOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
-export default function FileUpload() {
+interface FileUploadProps {
+  onUploadSuccess?: () => void;
+}
+
+export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
@@ -34,6 +38,10 @@ export default function FileUpload() {
         title: "File uploaded successfully",
         description: `Processed ${result.recordsProcessed} records`,
       });
+      
+      if (onUploadSuccess) {
+        onUploadSuccess();
+      }
     } catch (error) {
       toast({
         title: "Upload failed",

@@ -132,10 +132,21 @@ export const tankSpecifications = pgTable("tank_specifications", {
   capacity: integer("capacity").notNull(), // in liters
   height: integer("height").notNull(), // in mm
   diameter: integer("diameter"), // in mm
-  pressure: decimal("pressure", { precision: 10, scale: 2 }), // in bar
-  temperature: decimal("temperature", { precision: 10, scale: 2 }), // in celsius
-  material: text("material").notNull(), // Steel grade
+  width: integer("width"), // in mm - Excel form has width separately
+  // Excel-aligned pressure and temperature fields
+  pressure: decimal("pressure", { precision: 10, scale: 2 }), // in bar (numeric)
+  pressure_text: text("pressure_text"), // Excel format like "0 BAR"
+  temperature: decimal("temperature", { precision: 10, scale: 2 }), // in celsius (numeric)
+  temperature_text: text("temperature_text"), // Excel format like "SICAKLIK"
+  // Excel-aligned material fields
+  material: text("material").notNull(), // Steel grade (backward compatibility)
+  material_type: text("material_type"), // Excel: material type like "EVATHERM"
+  material_grade: text("material_grade"), // Excel: material grade like "super duplex-1.4410"
   thickness: decimal("thickness", { precision: 10, scale: 2 }), // in mm
+  // Additional Excel-derived fields
+  volume_calculated: numeric("volume_calculated"), // Calculated from dimensions
+  surface_area: numeric("surface_area"), // Calculated surface area
+  drawing_reference: text("drawing_reference"), // Excel form code reference
   features: jsonb("features"), // Additional features as JSON
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

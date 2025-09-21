@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterialSchema, insertSettingsSchema } from "@shared/schema";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import { CostAnalysisEngine } from "./cost-analysis-engine";
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -306,6 +307,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({ error: 'Invalid settings data', details: error.issues });
       } else {
         res.status(500).json({ error: 'Failed to create settings' });
+      }
+    }
+  });
+
+  // AI Auto-Analysis endpoint
+  app.post('/api/ai-analysis/calculate', async (req, res) => {
+    try {
+      // Validate tank specification input
+      const tankSpecData = insertTankSpecificationSchema.parse(req.body.tankSpec);
+      
+      // Get global settings for cost parameters
+      const globalSettings = await storage.getGlobalSettings();
+      if (!globalSettings) {
+        return res.status(400).json({ 
+          error: 'Global settings not configured. Please configure cost parameters in Settings.' 
+        });
+      }
+
+      // Calculate costs using AI engine
+      const costBreakdown = await CostAnalysisEngine.calculateCosts({
+        tankSpec: tankSpecData,
+        settings: globalSettings
+      });
+
+      // Generate auto cost analysis record
+      const autoCostAnalysis = CostAnalysisEngine.generateAutoCostAnalysis(
+        tankSpecData, 
+        costBreakdown
+      );
+
+      res.json({
+        breakdown: costBreakdown,
+        analysis: autoCostAnalysis,
+        message: 'Cost analysis calculated successfully by AI agent'
+      });
+      
+    } catch (error: any) {
+      console.error('AI Analysis calculation error:', error);
+      if (error?.name === 'ZodError' && error?.issues) {
+        res.status(400).json({ 
+          error: 'Invalid tank specification data', 
+          details: error.issues 
+        });
+      } else {
+        res.status(500).json({ error: 'Failed to calculate cost analysis' });
+      }
+    }
+  });
+
+  // AI Auto-Analysis with tank creation and cost analysis
+  app.post('/api/ai-analysis/full-analysis', async (req, res) => {
+    try {
+      // Validate tank specification input
+      const tankSpecData = insertTankSpecificationSchema.parse(req.body.tankSpec);
+      
+      // Get global settings
+      const globalSettings = await storage.getGlobalSettings();
+      if (!globalSettings) {
+        return res.status(400).json({ 
+          error: 'Global settings not configured. Please configure cost parameters in Settings.' 
+        });
+      }
+
+      // Step 1: Create tank specification
+      const createdTank = await storage.createTankSpecification(tankSpecData);
+
+      // Step 2: Calculate costs using AI engine
+      const costBreakdown = await CostAnalysisEngine.calculateCosts({
+        tankSpec: { ...tankSpecData, id: createdTank.id },
+        settings: globalSettings
+      });
+
+      // Step 3: Generate and save auto cost analysis
+      const autoCostAnalysis = CostAnalysisEngine.generateAutoCostAnalysis(
+        { ...tankSpecData, id: createdTank.id }, 
+        costBreakdown
+      );
+      
+      // Link to created tank
+      autoCostAnalysis.tankSpecificationId = createdTank.id;
+      
+      const savedAnalysis = await storage.createAutoCostAnalysis(autoCostAnalysis);
+
+      res.status(201).json({
+        tank: createdTank,
+        analysis: savedAnalysis,
+        breakdown: costBreakdown,
+        message: 'Tank created and cost analysis completed by AI agent'
+      });
+      
+    } catch (error) {
+      console.error('AI Full Analysis error:', error);
+      if (error.name === 'ZodError') {
+        res.status(400).json({ 
+          error: 'Invalid tank specification data', 
+          details: error.issues 
+        });
+      } else {
+        res.status(500).json({ error: 'Failed to complete full analysis' });
       }
     }
   });

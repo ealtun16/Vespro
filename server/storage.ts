@@ -317,6 +317,22 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // AI Analysis methods
+  async getGlobalSettings(): Promise<Settings | undefined> {
+    const result = await this.db
+      .select()
+      .from(settings)
+      .where(eq(settings.settingsType, "global"))
+      .limit(1);
+    
+    return result[0];
+  }
+
+  async createAutoCostAnalysis(analysis: InsertCostAnalysis): Promise<CostAnalysis> {
+    const [newAnalysis] = await this.db.insert(costAnalyses).values(analysis).returning();
+    return newAnalysis;
+  }
+
   // Settings methods implementation
   async getSettings(userId?: string): Promise<Settings | undefined> {
     if (userId) {
@@ -325,11 +341,17 @@ export class DatabaseStorage implements IStorage {
     return await this.getGlobalSettings();
   }
 
-  async getGlobalSettings(): Promise<Settings | undefined> {
-    const [globalSettings] = await db.select().from(settings)
-      .where(eq(settings.settingsType, "global"))
+  async getUserSettings(userId: string): Promise<Settings | undefined> {
+    const [userSettings] = await this.db.select().from(settings)
+      .where(and(eq(settings.settingsType, "user"), eq(settings.userId, userId)))
       .limit(1);
-    return globalSettings || undefined;
+    
+    // Fallback to global settings if user settings don't exist
+    if (!userSettings) {
+      return await this.getGlobalSettings();
+    }
+    
+    return userSettings;
   }
 
   async getUserSettings(userId: string): Promise<Settings | undefined> {

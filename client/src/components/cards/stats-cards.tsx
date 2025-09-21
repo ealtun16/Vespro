@@ -10,8 +10,8 @@ interface StatsCardsProps {
 export default function StatsCards({ stats, loading }: StatsCardsProps) {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {[...Array(2)].map((_, i) => (
           <Card key={i} className="card-shadow">
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -30,28 +30,14 @@ export default function StatsCards({ stats, loading }: StatsCardsProps) {
 
   const statItems = [
     {
-      label: "Total Reports",
+      label: "Toplam Raporlar",
       value: stats?.totalReports || 0,
       icon: FileText,
       bgColor: "bg-primary",
       testId: "stat-total-reports"
     },
     {
-      label: "Tank Models",
-      value: stats?.tankModels || 0,
-      icon: Factory,
-      bgColor: "bg-accent",
-      testId: "stat-tank-models"
-    },
-    {
-      label: "Avg. Cost",
-      value: `$${stats?.averageCost?.toLocaleString() || '0'}`,
-      icon: DollarSign,
-      bgColor: "bg-success",
-      testId: "stat-avg-cost"
-    },
-    {
-      label: "This Month",
+      label: "Bu Ay",
       value: stats?.monthlyReports || 0,
       icon: Calendar,
       bgColor: "bg-secondary",
@@ -60,7 +46,7 @@ export default function StatsCards({ stats, loading }: StatsCardsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
       {statItems.map((item) => (
         <Card key={item.label} className="card-shadow">
           <CardContent className="p-6">

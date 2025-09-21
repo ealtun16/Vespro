@@ -13,7 +13,7 @@ import { Settings2, Globe, DollarSign, Calculator, Bot } from "lucide-react";
 import type { Settings } from "@shared/schema";
 
 export default function SettingsPage() {
-  const { t } = useTranslation();
+  const { t, setLanguage } = useTranslation();
   const { toast } = useToast();
   
   const { data: settings, isLoading } = useQuery({
@@ -45,6 +45,11 @@ export default function SettingsPage() {
 
   const handleUpdateSettings = (field: keyof Settings, value: string | boolean) => {
     if (!settings) return;
+    
+    // If language is being changed, update i18n context immediately
+    if (field === 'language' && typeof value === 'string') {
+      setLanguage(value);
+    }
     
     const updatedSettings = {
       ...settings,
@@ -153,7 +158,7 @@ export default function SettingsPage() {
                 id="eurRate"
                 type="number"
                 step="0.0001"
-                value={settings.eurToUsdRate}
+                value={settings.eurToUsdRate || ''}
                 onChange={(e) => handleUpdateSettings('eurToUsdRate', e.target.value)}
                 data-testid="input-eur-rate"
               />
@@ -164,7 +169,7 @@ export default function SettingsPage() {
                 id="tryRate"
                 type="number"
                 step="0.0001"
-                value={settings.tryToUsdRate}
+                value={settings.tryToUsdRate || ''}
                 onChange={(e) => handleUpdateSettings('tryToUsdRate', e.target.value)}
                 data-testid="input-try-rate"
               />
@@ -189,7 +194,7 @@ export default function SettingsPage() {
                 id="materialMultiplier"
                 type="number"
                 step="0.001"
-                value={settings.materialCostMultiplier}
+                value={settings.materialCostMultiplier || ''}
                 onChange={(e) => handleUpdateSettings('materialCostMultiplier', e.target.value)}
                 data-testid="input-material-multiplier"
               />
@@ -200,7 +205,7 @@ export default function SettingsPage() {
                 id="laborMultiplier"
                 type="number"
                 step="0.001"
-                value={settings.laborCostMultiplier}
+                value={settings.laborCostMultiplier || ''}
                 onChange={(e) => handleUpdateSettings('laborCostMultiplier', e.target.value)}
                 data-testid="input-labor-multiplier"
               />
@@ -211,7 +216,7 @@ export default function SettingsPage() {
                 id="overheadMultiplier"
                 type="number"
                 step="0.001"
-                value={settings.overheadCostMultiplier}
+                value={settings.overheadCostMultiplier || ''}
                 onChange={(e) => handleUpdateSettings('overheadCostMultiplier', e.target.value)}
                 data-testid="input-overhead-multiplier"
               />
@@ -227,7 +232,7 @@ export default function SettingsPage() {
                 id="steelPrice"
                 type="number"
                 step="0.01"
-                value={settings.steelPricePerKg}
+                value={settings.steelPricePerKg || ''}
                 onChange={(e) => handleUpdateSettings('steelPricePerKg', e.target.value)}
                 data-testid="input-steel-price"
               />
@@ -238,7 +243,7 @@ export default function SettingsPage() {
                 id="laborRate"
                 type="number"
                 step="0.01"
-                value={settings.hourlyLaborRate}
+                value={settings.hourlyLaborRate || ''}
                 onChange={(e) => handleUpdateSettings('hourlyLaborRate', e.target.value)}
                 data-testid="input-labor-rate"
               />
@@ -249,7 +254,7 @@ export default function SettingsPage() {
                 id="overheadPercent"
                 type="number"
                 step="0.01"
-                value={settings.overheadPercentage}
+                value={settings.overheadPercentage || ''}
                 onChange={(e) => handleUpdateSettings('overheadPercentage', e.target.value)}
                 data-testid="input-overhead-percent"
               />
@@ -276,7 +281,7 @@ export default function SettingsPage() {
             </div>
             <Switch
               id="autoAnalysis"
-              checked={settings.autoAnalysisEnabled}
+              checked={settings.autoAnalysisEnabled || false}
               onCheckedChange={(checked) => handleUpdateSettings('autoAnalysisEnabled', checked)}
               data-testid="switch-auto-analysis"
             />
@@ -290,7 +295,7 @@ export default function SettingsPage() {
               step="0.01"
               min="0"
               max="1"
-              value={settings.analysisConfidenceThreshold}
+              value={settings.analysisConfidenceThreshold || ''}
               onChange={(e) => handleUpdateSettings('analysisConfidenceThreshold', e.target.value)}
               data-testid="input-confidence-threshold"
             />

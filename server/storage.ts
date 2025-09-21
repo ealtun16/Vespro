@@ -267,7 +267,13 @@ export class DatabaseStorage implements IStorage {
 
   async createVesproCostItems(items: InsertVesproCostItem[]): Promise<VesproCostItem[]> {
     if (items.length === 0) return [];
-    const newItems = await db.insert(vespro_cost_items).values(items).returning();
+    // Filter and convert category types to valid values
+    const validItems = items.map(item => ({
+      ...item,
+      cat1_type: item.cat1_type === 'ATOLYE_ISCILIK' || item.cat1_type === 'DIS_TEDARIK' ? item.cat1_type : null,
+      cat2_type: item.cat2_type === 'ATOLYE_ISCILIK' || item.cat2_type === 'DIS_TEDARIK' ? item.cat2_type : null,
+    }));
+    const newItems = await db.insert(vespro_cost_items).values(validItems).returning();
     return newItems;
   }
 
@@ -319,7 +325,7 @@ export class DatabaseStorage implements IStorage {
 
   // AI Analysis methods
   async getGlobalSettings(): Promise<Settings | undefined> {
-    const result = await this.db
+    const result = await db
       .select()
       .from(settings)
       .where(eq(settings.settingsType, "global"))
@@ -329,7 +335,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAutoCostAnalysis(analysis: InsertCostAnalysis): Promise<CostAnalysis> {
-    const [newAnalysis] = await this.db.insert(costAnalyses).values(analysis).returning();
+    const [newAnalysis] = await db.insert(costAnalyses).values(analysis).returning();
     return newAnalysis;
   }
 
@@ -342,8 +348,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserSettings(userId: string): Promise<Settings | undefined> {
-    const [userSettings] = await this.db.select().from(settings)
-      .where(and(eq(settings.settingsType, "user"), eq(settings.userId, userId)))
+    const [userSettings] = await db.select().from(settings)
+      .where(and(
+        eq(settings.userId, userId),
+        eq(settings.settingsType, "user")
+      ))
       .limit(1);
     
     // Fallback to global settings if user settings don't exist
@@ -352,16 +361,6 @@ export class DatabaseStorage implements IStorage {
     }
     
     return userSettings;
-  }
-
-  async getUserSettings(userId: string): Promise<Settings | undefined> {
-    const [userSettings] = await db.select().from(settings)
-      .where(and(
-        eq(settings.userId, userId),
-        eq(settings.settingsType, "user")
-      ))
-      .limit(1);
-    return userSettings || undefined;
   }
 
   async createSettings(settingsData: InsertSettings): Promise<Settings> {

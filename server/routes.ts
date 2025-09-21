@@ -193,7 +193,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vespro-forms/:id/content", async (req, res) => {
     try {
       const { id } = req.params;
-      const form = await storage.getVesproForm(id);
+      const allForms = await storage.getAllVesproForms();
+      const form = allForms.find(f => f.form_id === id);
       
       if (!form) {
         return res.status(404).json({ message: "Vespro form not found" });
@@ -431,13 +432,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Step 2: Calculate costs using AI engine
       const costBreakdown = await CostAnalysisEngine.calculateCosts({
-        tankSpec: { ...createdTank },
+        tankSpec: {
+          ...tankSpecData,
+          id: createdTank.id
+        },
         settings: globalSettings
       });
 
       // Step 3: Generate and save auto cost analysis
       const autoCostAnalysis = CostAnalysisEngine.generateAutoCostAnalysis(
-        { ...createdTank }, 
+        {
+          ...tankSpecData,
+          id: createdTank.id
+        }, 
         costBreakdown
       );
       

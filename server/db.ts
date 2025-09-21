@@ -11,5 +11,28 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Configure pool with better connection management
+export const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  max: 10,
+  idleTimeoutMillis: 60000,
+  connectionTimeoutMillis: 10000,
+});
+
 export const db = drizzle({ client: pool, schema });
+
+// Handle pool errors to prevent crashes
+pool.on('error', (err) => {
+  console.error('Database pool error:', err);
+});
+
+// Graceful shutdown handler
+process.on('SIGTERM', () => {
+  console.log('Closing database pool...');
+  pool.end();
+});
+
+process.on('SIGINT', () => {
+  console.log('Closing database pool...');
+  pool.end();
+});

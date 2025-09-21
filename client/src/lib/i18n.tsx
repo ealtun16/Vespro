@@ -488,6 +488,7 @@ interface I18nProviderProps {
 
 export function I18nProvider({ children }: I18nProviderProps) {
   const [language, setLanguage] = useState<string>('tr');
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   useEffect(() => {
     // Load language preference from localStorage
@@ -495,6 +496,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
     if (savedLanguage) {
       setLanguage(savedLanguage);
     }
+    setIsInitialized(true);
   }, []);
 
   const handleSetLanguage = (lang: string) => {
@@ -503,21 +505,33 @@ export function I18nProvider({ children }: I18nProviderProps) {
   };
 
   const t = (key: TranslationKey, params?: Record<string, string | number>): string => {
-    const currentTranslations = translations[language as keyof typeof translations] as Record<string, string> | undefined;
-    let value = currentTranslations?.[key] || translations.tr[key] || key;
-    
-    // Handle interpolation
-    if (params && typeof value === 'string') {
-      value = value.replace(/\{\{(\w+)\}\}/g, (match, paramKey) => {
-        return params[paramKey]?.toString() || match;
-      });
+    try {
+      const currentTranslations = translations[language as keyof typeof translations] as Record<string, string> | undefined;
+      let value = currentTranslations?.[key] || translations.tr[key] || translations.en[key] || key;
+      
+      // Handle interpolation
+      if (params && typeof value === 'string') {
+        value = value.replace(/\{\{(\w+)\}\}/g, (match, paramKey) => {
+          return params[paramKey]?.toString() || match;
+        });
+      }
+      
+      return value;
+    } catch (error) {
+      console.error('Error in translation function:', error);
+      return key;
     }
-    
-    return value;
   };
 
+  const contextValue = {
+    t,
+    language,
+    setLanguage: handleSetLanguage
+  };
+
+  // Always provide the context value, even during initialization
   return (
-    <I18nContext.Provider value={{ t, language, setLanguage: handleSetLanguage }}>
+    <I18nContext.Provider value={contextValue}>
       {children}
     </I18nContext.Provider>
   );
@@ -526,7 +540,28 @@ export function I18nProvider({ children }: I18nProviderProps) {
 export function useTranslation() {
   const context = useContext(I18nContext);
   if (context === undefined) {
-    throw new Error('useTranslation must be used within an I18nProvider');
+    // Provide fallback function instead of throwing error
+    console.warn('useTranslation called outside of I18nProvider, using fallback');
+    return {
+      t: (key: TranslationKey, params?: Record<string, string | number>) => {
+        // Fallback to the key itself or English translation
+        const englishTranslations = translations.en as Record<string, string>;
+        let value = englishTranslations[key] || key;
+        
+        // Handle interpolation
+        if (params && typeof value === 'string') {
+          value = value.replace(/\{\{(\w+)\}\}/g, (match, paramKey) => {
+            return params[paramKey]?.toString() || match;
+          });
+        }
+        
+        return value;
+      },
+      language: 'en',
+      setLanguage: () => {
+        console.warn('setLanguage called outside of I18nProvider');
+      }
+    };
   }
   return context;
 }

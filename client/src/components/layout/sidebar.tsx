@@ -40,7 +40,7 @@ export default function Sidebar() {
                         ? "nav-item-active bg-sidebar-primary text-sidebar-primary-foreground"
                         : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     )}
-                    data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
+                    data-testid={`nav-${item.href.replace(/\//g, '').replace(/^$/, 'dashboard')}`}
                   >
                     <item.icon className="mr-3 h-4 w-4" />
                     {item.label}

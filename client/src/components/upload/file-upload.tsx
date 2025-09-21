@@ -21,8 +21,8 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
 
     if (!file.name.match(/\.(xlsx|xls)$/)) {
       toast({
-        title: "Invalid file type",
-        description: "Please upload an Excel file (.xlsx or .xls)",
+        title: t('toast.invalidFileType'),
+        description: t('toast.invalidFileDescription'),
         variant: "destructive",
       });
       return;
@@ -38,7 +38,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       
       toast({
         title: t('toast.uploadSuccess'),
-        description: t('import.processedCount').replace('{{count}}', result.recordsProcessed),
+        description: t('import.processedCount', { count: result.recordsProcessed }),
       });
       
       if (onUploadSuccess) {
@@ -47,7 +47,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     } catch (error) {
       toast({
         title: t('toast.uploadFailed'),
-        description: "Excel dosyası yükleme ve işleme başarısız oldu",
+        description: t('toast.uploadFailedDescription'),
         variant: "destructive",
       });
     } finally {
@@ -58,8 +58,8 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
 
   const handleBulkImport = () => {
     toast({
-      title: "Feature coming soon",
-      description: "Bulk import functionality will be available soon",
+      title: t('toast.featureComingSoon'),
+      description: t('toast.featureComingSoonDescription'),
     });
   };
 
@@ -87,7 +87,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
               data-testid="button-choose-files"
             >
               <Upload className="mr-2 h-4 w-4" />
-              {uploading ? 'Uploading...' : 'Choose Files'}
+              {uploading ? t('import.uploading') : t('import.chooseFiles')}
             </Button>
             <input
               id="file-input"
@@ -102,7 +102,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
               data-testid="button-bulk-import"
             >
               <FolderOpen className="mr-2 h-4 w-4" />
-              Bulk Import
+              {t('import.bulkImport')}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-4" data-testid="text-supported-formats">

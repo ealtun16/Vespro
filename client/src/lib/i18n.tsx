@@ -37,6 +37,10 @@ const translations = {
   'import.noRecords': 'Henüz kayıt yok',
   'import.startByUploading': 'Excel dosyası yükleyerek başlayın',
   'import.processedCount': '{{count}} kayıt işlendi',
+  'import.guidelinesTitle': 'İçe Aktarma Kuralları',
+  'import.requiredColumns': 'Gerekli Excel Sütunları:',
+  'import.optionalColumns': 'İsteğe Bağlı Sütunlar:',
+  'import.fileRequirements': 'Dosya Gereksinimleri:',
 
   // Activity Messages
   'activity.reportUploaded': 'Yeni maliyet analizi raporu yüklendi: {{id}}',
@@ -81,8 +85,11 @@ const translations = {
   'toast.uploadSuccess': 'Dosya başarıyla yüklendi',
   'toast.uploadFailed': 'Yükleme başarısız',
   'toast.invalidFileType': 'Geçersiz dosya türü',
+  'toast.invalidFileDescription': 'Lütfen Excel dosyası (.xlsx veya .xls) yükleyin',
+  'toast.uploadFailedDescription': 'Excel dosyası yükleme ve işleme başarısız oldu',
   'toast.fileTooLarge': 'Dosya çok büyük',
   'toast.featureComingSoon': 'Özellik yakında geliyor',
+  'toast.featureComingSoonDescription': 'Toplu içe aktarma özelliği yakında kullanılabilir olacak',
 
   // Cost Analysis
   'cost.materialCost': 'Malzeme Maliyeti',
@@ -106,7 +113,30 @@ const translations = {
   'common.notes': 'Notlar',
   'common.cancel': 'İptal',
   'common.save': 'Kaydet',
-  'common.close': 'Kapat'
+  'common.close': 'Kapat',
+  
+  // Import Guidelines - Required Columns
+  'import.guideline.reportId': 'Rapor ID - Maliyet analizi için benzersiz tanımlayıcı',
+  'import.guideline.tankType': 'Tank Tipi - Depolama Tankı, Basınç Kabı veya Isı Değiştiricisi',
+  'import.guideline.tankName': 'Tank Adı - Tank için açıklayıcı ad',
+  'import.guideline.capacity': 'Kapasite - Tank kapasitesi litre cinsinden',
+  'import.guideline.height': 'Yükseklik - Tank yüksekliği milimetre cinsinden',
+  'import.guideline.materialCost': 'Malzeme Maliyeti - USD cinsinden malzeme maliyeti',
+  'import.guideline.laborCost': 'İşçilik Maliyeti - USD cinsinden işçilik maliyetleri',
+  'import.guideline.overheadCost': 'Genel Gider - USD cinsinden genel gider maliyetleri',
+  'import.guideline.totalCost': 'Toplam Maliyet - USD cinsinden toplam proje maliyeti',
+  
+  // Import Guidelines - Optional Columns  
+  'import.guideline.material': 'Malzeme - Çelik kalitesi veya malzeme türü',
+  'import.guideline.thickness': 'Kalınlık - Duvar kalınlığı milimetre cinsinden',
+  'import.guideline.pressure': 'Basınç - Çalışma basıncı bar cinsinden',
+  'import.guideline.temperature': 'Sıcaklık - Çalışma sıcaklığı Celsius cinsinden',
+  
+  // Import Guidelines - File Requirements
+  'import.guideline.maxFileSize': 'Maksimum dosya boyutu: 10MB',
+  'import.guideline.supportedFormats': 'Desteklenen formatlar: .xlsx, .xls',
+  'import.guideline.dataStartRow': 'Veriler 2. satırdan başlamalı (başlıklar için 1. satır)',
+  'import.guideline.requiredColumnsPresent': 'Tüm gerekli sütunlar bulunmalı'
   },
   en: {
     // English translations can be added later
@@ -116,7 +146,7 @@ const translations = {
 type TranslationKey = keyof typeof translations.tr;
 
 interface I18nContextType {
-  t: (key: TranslationKey) => string;
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   language: string;
   setLanguage: (lang: string) => void;
 }
@@ -143,9 +173,18 @@ export function I18nProvider({ children }: I18nProviderProps) {
     localStorage.setItem('language', lang);
   };
 
-  const t = (key: TranslationKey): string => {
+  const t = (key: TranslationKey, params?: Record<string, string | number>): string => {
     const currentTranslations = translations[language as keyof typeof translations] as Record<string, string> | undefined;
-    return currentTranslations?.[key] || translations.tr[key] || key;
+    let value = currentTranslations?.[key] || translations.tr[key] || key;
+    
+    // Handle interpolation
+    if (params && typeof value === 'string') {
+      value = value.replace(/\{\{(\w+)\}\}/g, (match, paramKey) => {
+        return params[paramKey]?.toString() || match;
+      });
+    }
+    
+    return value;
   };
 
   return (

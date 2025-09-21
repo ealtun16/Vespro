@@ -53,28 +53,28 @@ export default function Dashboard() {
           <div className="flex items-center space-x-3">
             <div className="w-2 h-2 bg-success rounded-full"></div>
             <span className="text-sm text-foreground" data-testid="activity-item-1">
-              {t('activity.reportUploaded').replace('{{id}}', 'TCA-2024-005')}
+              {t('activity.reportUploaded', { id: 'TCA-2024-005' })}
             </span>
             <span className="text-xs text-muted-foreground ml-auto" data-testid="activity-time-1">
-              {t('time.hoursAgo').replace('{{count}}', '2')}
+              {t('time.hoursAgo', { count: '2' })}
             </span>
           </div>
           <div className="flex items-center space-x-3">
             <div className="w-2 h-2 bg-accent rounded-full"></div>
-            <span className="text-sm text-foreground" data-testid="text-activity-2">
-              Tank specification updated: Storage Tank 3000L
+            <span className="text-sm text-foreground" data-testid="activity-item-2">
+              {t('activity.tankUpdated', { name: 'Depolama Tankı 3000L' })}
             </span>
-            <span className="text-xs text-muted-foreground ml-auto" data-testid="text-activity-time-2">
-              4 hours ago
+            <span className="text-xs text-muted-foreground ml-auto" data-testid="activity-time-2">
+              {t('time.hoursAgo', { count: '4' })}
             </span>
           </div>
           <div className="flex items-center space-x-3">
             <div className="w-2 h-2 bg-primary rounded-full"></div>
             <span className="text-sm text-foreground" data-testid="activity-item-3">
-              {t('activity.excelExported').replace('{{filename}}', 'Aylik_Maliyet_Raporu.xlsx')}
+              {t('activity.excelExported', { filename: 'Aylik_Maliyet_Raporu.xlsx' })}
             </span>
             <span className="text-xs text-muted-foreground ml-auto" data-testid="activity-time-3">
-              {t('time.hoursAgo').replace('{{count}}', '6')}
+              {t('time.hoursAgo', { count: '6' })}
             </span>
           </div>
           <div className="flex items-center space-x-3">
@@ -83,7 +83,7 @@ export default function Dashboard() {
               {t('activity.backupCompleted')}
             </span>
             <span className="text-xs text-muted-foreground ml-auto" data-testid="activity-time-4">
-              {t('time.hoursAgo').replace('{{count}}', '8')}
+              {t('time.hoursAgo', { count: '8' })}
             </span>
           </div>
         </div>

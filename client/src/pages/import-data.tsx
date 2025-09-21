@@ -34,26 +34,26 @@ export default function ImportData() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            İçe Aktarılan Kayıtlar
+            {t('import.importedRecords')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-              <p className="mt-2 text-sm text-muted-foreground">Kayıtlar yükleniyor...</p>
+              <p className="mt-2 text-sm text-muted-foreground">{t('import.loadingRecords')}</p>
             </div>
           ) : vesproForms && Array.isArray(vesproForms) && vesproForms.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Form Başlığı</TableHead>
-                    <TableHead>Tank Adı</TableHead>
-                    <TableHead>Tank Tipi</TableHead>
-                    <TableHead>Para Birimi</TableHead>
-                    <TableHead>İçe Aktarma Tarihi</TableHead>
-                    <TableHead>İşlemler</TableHead>
+                    <TableHead>{t('table.formTitle')}</TableHead>
+                    <TableHead>{t('table.tankName')}</TableHead>
+                    <TableHead>{t('table.tankType')}</TableHead>
+                    <TableHead>{t('table.currency')}</TableHead>
+                    <TableHead>{t('table.importDate')}</TableHead>
+                    <TableHead>{t('table.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -94,8 +94,8 @@ export default function ImportData() {
           ) : (
             <div className="text-center py-8">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-              <p className="text-muted-foreground">Henüz kayıt yok</p>
-              <p className="text-sm text-muted-foreground">Excel dosyası yükleyerek başlayın</p>
+              <p className="text-muted-foreground">{t('import.noRecords')}</p>
+              <p className="text-sm text-muted-foreground">{t('import.startByUploading')}</p>
             </div>
           )}
         </CardContent>
@@ -103,40 +103,40 @@ export default function ImportData() {
 
       <Card className="card-shadow">
         <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4" data-testid="text-import-guidelines">
-            Import Guidelines
+          <h2 className="text-lg font-semibold text-foreground mb-4" data-testid="import-guidelines-title">
+            {t('import.guidelinesTitle')}
           </h2>
           <div className="space-y-4 text-sm text-muted-foreground">
             <div>
-              <h3 className="font-medium text-foreground mb-2">Required Excel Columns:</h3>
+              <h3 className="font-medium text-foreground mb-2">{t('import.requiredColumns')}</h3>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Report ID - Unique identifier for the cost analysis</li>
-                <li>Tank Type - Storage Tank, Pressure Vessel, or Heat Exchanger</li>
-                <li>Tank Name - Descriptive name for the tank</li>
-                <li>Capacity - Tank capacity in liters</li>
-                <li>Height - Tank height in millimeters</li>
-                <li>Material Cost - Cost of materials in USD</li>
-                <li>Labor Cost - Labor costs in USD</li>
-                <li>Overhead Cost - Overhead costs in USD</li>
-                <li>Total Cost - Total project cost in USD</li>
+                <li>{t('import.guideline.reportId')}</li>
+                <li>{t('import.guideline.tankType')}</li>
+                <li>{t('import.guideline.tankName')}</li>
+                <li>{t('import.guideline.capacity')}</li>
+                <li>{t('import.guideline.height')}</li>
+                <li>{t('import.guideline.materialCost')}</li>
+                <li>{t('import.guideline.laborCost')}</li>
+                <li>{t('import.guideline.overheadCost')}</li>
+                <li>{t('import.guideline.totalCost')}</li>
               </ul>
             </div>
             <div>
-              <h3 className="font-medium text-foreground mb-2">Optional Columns:</h3>
+              <h3 className="font-medium text-foreground mb-2">{t('import.optionalColumns')}</h3>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Material - Steel grade or material type</li>
-                <li>Thickness - Wall thickness in millimeters</li>
-                <li>Pressure - Operating pressure in bar</li>
-                <li>Temperature - Operating temperature in Celsius</li>
+                <li>{t('import.guideline.material')}</li>
+                <li>{t('import.guideline.thickness')}</li>
+                <li>{t('import.guideline.pressure')}</li>
+                <li>{t('import.guideline.temperature')}</li>
               </ul>
             </div>
             <div>
-              <h3 className="font-medium text-foreground mb-2">File Requirements:</h3>
+              <h3 className="font-medium text-foreground mb-2">{t('import.fileRequirements')}</h3>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Maximum file size: 10MB</li>
-                <li>Supported formats: .xlsx, .xls</li>
-                <li>Data should start from row 2 (row 1 for headers)</li>
-                <li>All required columns must be present</li>
+                <li>{t('import.guideline.maxFileSize')}</li>
+                <li>{t('import.guideline.supportedFormats')}</li>
+                <li>{t('import.guideline.dataStartRow')}</li>
+                <li>{t('import.guideline.requiredColumnsPresent')}</li>
               </ul>
             </div>
           </div>

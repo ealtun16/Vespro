@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Eye, FileText } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { tr } from "date-fns/locale";
+import { useTranslation } from "@/lib/i18n";
 
 export default function ImportData() {
+  const { t } = useTranslation();
   const { data: vesproForms = [], isLoading, refetch } = useQuery({
     queryKey: ['/api/vespro-forms'],
     select: (data: any) => data || []
@@ -17,10 +20,10 @@ export default function ImportData() {
     <div className="space-y-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground" data-testid="text-page-title">
-          Import Data
+          {t('import.title')}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground" data-testid="text-page-description">
-          Import Excel files containing tank cost analysis data
+          {t('import.subtitle')}
         </p>
       </div>
 
@@ -60,7 +63,7 @@ export default function ImportData() {
                         {form.form_title}
                       </TableCell>
                       <TableCell data-testid={`text-tank-name-${form.form_id}`}>
-                        {form.tank_name || 'Belirtilmemiş'}
+                        {form.tank_name || t('status.unspecified')}
                       </TableCell>
                       <TableCell data-testid={`text-tank-type-${form.form_id}`}>
                         {form.tank_type && (
@@ -71,7 +74,7 @@ export default function ImportData() {
                         {form.currency}
                       </TableCell>
                       <TableCell data-testid={`text-import-date-${form.form_id}`}>
-                        {form.created_at && formatDistanceToNow(new Date(form.created_at), { addSuffix: true })}
+                        {form.created_at && formatDistanceToNow(new Date(form.created_at), { addSuffix: true, locale: tr })}
                       </TableCell>
                       <TableCell>
                         <Button 
@@ -80,7 +83,7 @@ export default function ImportData() {
                           data-testid={`button-view-${form.form_id}`}
                         >
                           <Eye className="h-4 w-4 mr-1" />
-                          Görüntüle
+                          {t('action.view')}
                         </Button>
                       </TableCell>
                     </TableRow>

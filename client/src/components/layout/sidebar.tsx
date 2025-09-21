@@ -8,18 +8,20 @@ import {
   Factory
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/import", label: "Import Data", icon: Upload },
-  { href: "/tank-specifications", label: "Tank Specifications", icon: Factory },
-  { href: "/cost-analysis", label: "Cost Analysis", icon: BarChart3 },
-  { href: "/reports", label: "Reports", icon: FileSpreadsheet },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
+import { useTranslation } from "@/lib/i18n";
 
 export default function Sidebar() {
   const [location] = useLocation();
+  const { t } = useTranslation();
+  
+  const navItems = [
+    { href: "/", label: t('nav.dashboard'), icon: LayoutDashboard },
+    { href: "/import", label: t('nav.import'), icon: Upload },
+    { href: "/tank-specifications", label: t('nav.tankSpecs'), icon: Factory },
+    { href: "/cost-analysis", label: t('nav.costAnalysis'), icon: BarChart3 },
+    { href: "/reports", label: t('nav.reports'), icon: FileSpreadsheet },
+    { href: "/settings", label: t('nav.settings'), icon: Settings },
+  ];
 
   return (
     <aside className="w-64 bg-sidebar border-r border-sidebar-border card-shadow">

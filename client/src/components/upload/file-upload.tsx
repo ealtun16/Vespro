@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, FileSpreadsheet, FolderOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "@/lib/i18n";
 import { apiRequest } from "@/lib/queryClient";
 
 interface FileUploadProps {
@@ -12,6 +13,7 @@ interface FileUploadProps {
 export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -35,8 +37,8 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       const result = await response.json();
       
       toast({
-        title: "File uploaded successfully",
-        description: `Processed ${result.recordsProcessed} records`,
+        title: t('toast.uploadSuccess'),
+        description: t('import.processedCount').replace('{{count}}', result.recordsProcessed),
       });
       
       if (onUploadSuccess) {
@@ -44,8 +46,8 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       }
     } catch (error) {
       toast({
-        title: "Upload failed",
-        description: "Failed to upload and process the Excel file",
+        title: t('toast.uploadFailed'),
+        description: "Excel dosyası yükleme ve işleme başarısız oldu",
         variant: "destructive",
       });
     } finally {
@@ -65,17 +67,17 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     <Card className="card-shadow mb-8">
       <CardContent className="p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4" data-testid="text-import-title">
-          Import Cost Analysis
+          {t('import.uploadTitle')}
         </h2>
         <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
           <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
             <FileSpreadsheet className="text-2xl text-accent h-6 w-6" />
           </div>
           <p className="text-lg font-medium text-foreground mb-2" data-testid="text-upload-title">
-            Upload Excel Cost Analysis
+            {t('import.uploadTitle')}
           </p>
           <p className="text-sm text-muted-foreground mb-4" data-testid="text-upload-description">
-            Drag and drop your Excel files here, or click to browse
+            {t('import.uploadDescription')}
           </p>
           <div className="flex justify-center space-x-4">
             <Button 
@@ -104,7 +106,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-4" data-testid="text-supported-formats">
-            Supported formats: .xlsx, .xls (Max 10MB)
+            {t('import.supportedFormats')}
           </p>
         </div>
       </CardContent>

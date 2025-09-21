@@ -1,7 +1,7 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterialSchema } from "@shared/schema";
+import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterialSchema, insertSettingsSchema } from "@shared/schema";
 import multer from "multer";
 import * as XLSX from "xlsx";
 
@@ -250,6 +250,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error exporting Excel file:", error);
       res.status(500).json({ message: "Failed to export Excel file" });
+    }
+  });
+
+  // Settings endpoints
+  app.get('/api/settings', async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      const settings = await storage.getSettings(userId);
+      
+      // If no settings exist, create default global settings
+      if (!settings) {
+        const defaultSettings = await storage.createSettings({
+          settingsType: "global",
+          language: "tr",
+          currency: "USD"
+        });
+        return res.json(defaultSettings);
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+      res.status(500).json({ error: 'Failed to fetch settings' });
+    }
+  });
+
+  app.put('/api/settings/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Validate request body against schema
+      const updateData = insertSettingsSchema.partial().parse(req.body);
+      
+      const updatedSettings = await storage.updateSettings(id, updateData);
+      if (!updatedSettings) {
+        return res.status(404).json({ error: 'Settings not found' });
+      }
+      
+      res.json(updatedSettings);
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      res.status(500).json({ error: 'Failed to update settings' });
+    }
+  });
+
+  app.post('/api/settings', async (req, res) => {
+    try {
+      const settingsData = insertSettingsSchema.parse(req.body);
+      const newSettings = await storage.createSettings(settingsData);
+      res.status(201).json(newSettings);
+    } catch (error) {
+      console.error('Error creating settings:', error);
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Invalid settings data', details: error.issues });
+      } else {
+        res.status(500).json({ error: 'Failed to create settings' });
+      }
     }
   });
 

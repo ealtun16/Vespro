@@ -4,6 +4,7 @@ import {
   costAnalyses,
   materials,
   costAnalysisMaterials,
+  settings,
   // Vespro schema
   vespro_forms,
   vespro_cost_items,
@@ -21,6 +22,8 @@ import {
   type InsertMaterial,
   type CostAnalysisMaterial,
   type InsertCostAnalysisMaterial,
+  type Settings,
+  type InsertSettings,
   // Vespro types
   type VesproForm,
   type InsertVesproForm,
@@ -69,6 +72,13 @@ export interface IStorage {
 
   // Dashboard stats
   getDashboardStats(): Promise<any>;
+
+  // Settings methods
+  getSettings(userId?: string): Promise<Settings | undefined>;
+  createSettings(settings: InsertSettings): Promise<Settings>;
+  updateSettings(id: string, settings: Partial<InsertSettings>): Promise<Settings | undefined>;
+  getGlobalSettings(): Promise<Settings | undefined>;
+  getUserSettings(userId: string): Promise<Settings | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -305,6 +315,44 @@ export class DatabaseStorage implements IStorage {
       averageCost: Math.round(avgCost.avg || 0),
       monthlyReports: monthlyReports.count,
     };
+  }
+
+  // Settings methods implementation
+  async getSettings(userId?: string): Promise<Settings | undefined> {
+    if (userId) {
+      return await this.getUserSettings(userId);
+    }
+    return await this.getGlobalSettings();
+  }
+
+  async getGlobalSettings(): Promise<Settings | undefined> {
+    const [globalSettings] = await db.select().from(settings)
+      .where(eq(settings.settingsType, "global"))
+      .limit(1);
+    return globalSettings || undefined;
+  }
+
+  async getUserSettings(userId: string): Promise<Settings | undefined> {
+    const [userSettings] = await db.select().from(settings)
+      .where(and(
+        eq(settings.userId, userId),
+        eq(settings.settingsType, "user")
+      ))
+      .limit(1);
+    return userSettings || undefined;
+  }
+
+  async createSettings(settingsData: InsertSettings): Promise<Settings> {
+    const [newSettings] = await db.insert(settings).values(settingsData).returning();
+    return newSettings;
+  }
+
+  async updateSettings(id: string, settingsData: Partial<InsertSettings>): Promise<Settings | undefined> {
+    const [updatedSettings] = await db.update(settings)
+      .set({ ...settingsData, updatedAt: new Date() })
+      .where(eq(settings.id, id))
+      .returning();
+    return updatedSettings || undefined;
   }
 }
 

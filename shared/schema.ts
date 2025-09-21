@@ -189,6 +189,30 @@ export const costAnalysisMaterials = pgTable("cost_analysis_materials", {
   totalCost: decimal("total_cost", { precision: 10, scale: 2 }).notNull(),
 });
 
+export const settings = pgTable("settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id), // null for global settings
+  settingsType: text("settings_type").notNull().default("global"), // "user" or "global"
+  language: text("language").notNull().default("tr"), // "tr" or "en"
+  currency: text("currency").notNull().default("USD"), // "USD", "EUR", "TRY"
+  // Cost calculation parameters
+  materialCostMultiplier: decimal("material_cost_multiplier", { precision: 5, scale: 3 }).default("1.000"),
+  laborCostMultiplier: decimal("labor_cost_multiplier", { precision: 5, scale: 3 }).default("1.000"),
+  overheadCostMultiplier: decimal("overhead_cost_multiplier", { precision: 5, scale: 3 }).default("1.000"),
+  // Additional cost parameters for AI analysis
+  steelPricePerKg: decimal("steel_price_per_kg", { precision: 10, scale: 2 }).default("2.50"), // USD per kg
+  hourlyLaborRate: decimal("hourly_labor_rate", { precision: 10, scale: 2 }).default("25.00"), // USD per hour
+  overheadPercentage: decimal("overhead_percentage", { precision: 5, scale: 2 }).default("15.00"), // 15%
+  // Currency exchange rates (base currency is USD)
+  eurToUsdRate: decimal("eur_to_usd_rate", { precision: 8, scale: 4 }).default("1.0800"),
+  tryToUsdRate: decimal("try_to_usd_rate", { precision: 8, scale: 4 }).default("0.0300"),
+  // AI analysis preferences
+  autoAnalysisEnabled: boolean("auto_analysis_enabled").default(true),
+  analysisConfidenceThreshold: decimal("analysis_confidence_threshold", { precision: 3, scale: 2 }).default("0.80"), // 80%
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const tankSpecificationsRelations = relations(tankSpecifications, ({ many }) => ({
   costAnalyses: many(costAnalyses),
@@ -236,6 +260,11 @@ export const insertMaterialSchema = createInsertSchema(materials).omit({
 export const insertCostAnalysisMaterialSchema = createInsertSchema(costAnalysisMaterials).omit({ 
   id: true 
 });
+export const insertSettingsSchema = createInsertSchema(settings).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -248,6 +277,8 @@ export type Material = typeof materials.$inferSelect;
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
 export type CostAnalysisMaterial = typeof costAnalysisMaterials.$inferSelect;
 export type InsertCostAnalysisMaterial = z.infer<typeof insertCostAnalysisMaterialSchema>;
+export type Settings = typeof settings.$inferSelect;
+export type InsertSettings = z.infer<typeof insertSettingsSchema>;
 
 // Vespro insert schemas
 export const insertVesproFormSchema = createInsertSchema(vespro_forms).omit({ 

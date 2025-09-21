@@ -114,6 +114,38 @@ const translations = {
   'common.cancel': 'İptal',
   'common.save': 'Kaydet',
   'common.close': 'Kapat',
+
+  // Settings Page
+  'settings.subtitle': 'Sistem ayarlarını yönetin ve maliyet analizi parametrelerini yapılandırın',
+  'settings.updateSuccess': 'Ayarlar başarıyla güncellendi',
+  'settings.updateFailed': 'Ayarlar güncellenemedi',
+  'settings.notFound': 'Ayarlar bulunamadı',
+  
+  // Language Settings
+  'settings.language.title': 'Dil ve Yerelleştirme',
+  'settings.language.label': 'Arayüz Dili',
+  
+  // Currency Settings
+  'settings.currency.title': 'Para Birimi Ayarları',
+  'settings.currency.primary': 'Ana Para Birimi',
+  'settings.currency.eurRate': 'EUR/USD Kuru',
+  'settings.currency.tryRate': 'TRY/USD Kuru',
+  
+  // Cost Calculation Settings
+  'settings.cost.title': 'Maliyet Hesaplama Parametreleri',
+  'settings.cost.materialMultiplier': 'Malzeme Maliyet Çarpanı',
+  'settings.cost.laborMultiplier': 'İşçilik Maliyet Çarpanı',
+  'settings.cost.overheadMultiplier': 'Genel Gider Çarpanı',
+  'settings.cost.steelPrice': 'Çelik Fiyatı (USD/kg)',
+  'settings.cost.laborRate': 'Saatlik İşçilik Ücreti (USD)',
+  'settings.cost.overheadPercent': 'Genel Gider Yüzdesi (%)',
+  
+  // AI Analysis Settings
+  'settings.ai.title': 'Yapay Zeka Analiz Ayarları',
+  'settings.ai.autoAnalysis': 'Otomatik Analiz',
+  'settings.ai.autoAnalysisDescription': 'Yeni kayıtlar için otomatik maliyet analizi yapılsın',
+  'settings.ai.confidenceThreshold': 'Güven Eşiği',
+  'settings.ai.confidenceDescription': 'Analiz sonuçları için minimum güven seviyesi (0-1 arası)',
   
   // Import Guidelines - Required Columns
   'import.guideline.reportId': 'Rapor ID - Maliyet analizi için benzersiz tanımlayıcı',

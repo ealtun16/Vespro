@@ -167,7 +167,7 @@ export const costAnalyses = pgTable("cost_analyses", {
   laborCost: decimal("labor_cost", { precision: 12, scale: 2 }).notNull(),
   overheadCost: decimal("overhead_cost", { precision: 12, scale: 2 }).notNull(),
   totalCost: decimal("total_cost", { precision: 12, scale: 2 }).notNull(),
-  currency: text("currency").default("USD"),
+  currency: text("currency").default("EUR"),
   analysisDate: timestamp("analysis_date").defaultNow(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -197,14 +197,14 @@ export const settings = pgTable("settings", {
   userId: varchar("user_id").references(() => users.id), // null for global settings
   settingsType: text("settings_type").notNull().default("global"), // "user" or "global"
   language: text("language").notNull().default("tr"), // "tr" or "en"
-  currency: text("currency").notNull().default("USD"), // "USD", "EUR", "TRY"
+  currency: text("currency").notNull().default("EUR"), // "USD", "EUR", "TRY"
   // Cost calculation parameters
   materialCostMultiplier: decimal("material_cost_multiplier", { precision: 5, scale: 3 }).default("1.000"),
   laborCostMultiplier: decimal("labor_cost_multiplier", { precision: 5, scale: 3 }).default("1.000"),
   overheadCostMultiplier: decimal("overhead_cost_multiplier", { precision: 5, scale: 3 }).default("1.000"),
   // Additional cost parameters for AI analysis
-  steelPricePerKg: decimal("steel_price_per_kg", { precision: 10, scale: 2 }).default("2.50"), // USD per kg
-  hourlyLaborRate: decimal("hourly_labor_rate", { precision: 10, scale: 2 }).default("25.00"), // USD per hour
+  steelPricePerKg: decimal("steel_price_per_kg", { precision: 10, scale: 2 }).default("2.50"), // EUR per kg
+  hourlyLaborRate: decimal("hourly_labor_rate", { precision: 10, scale: 2 }).default("25.00"), // EUR per hour
   overheadPercentage: decimal("overhead_percentage", { precision: 5, scale: 2 }).default("15.00"), // 15%
   // Currency exchange rates (base currency is USD)
   eurToUsdRate: decimal("eur_to_usd_rate", { precision: 8, scale: 4 }).default("1.0800"),

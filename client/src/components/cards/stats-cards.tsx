@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, Factory, DollarSign, Calendar } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "@/lib/i18n";
 
 interface StatsCardsProps {
   stats: any;
@@ -28,16 +29,18 @@ export default function StatsCards({ stats, loading }: StatsCardsProps) {
     );
   }
 
+  const { t } = useTranslation();
+  
   const statItems = [
     {
-      label: "Toplam Raporlar",
+      label: t('dashboard.stats.totalReports'),
       value: stats?.totalReports || 0,
       icon: FileText,
       bgColor: "bg-primary",
       testId: "stat-total-reports"
     },
     {
-      label: "Bu Ay",
+      label: t('dashboard.stats.monthlyReports'),
       value: stats?.monthlyReports || 0,
       icon: Calendar,
       bgColor: "bg-secondary",

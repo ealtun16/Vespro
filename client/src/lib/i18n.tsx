@@ -231,7 +231,10 @@ const translations = {
   'import.guideline.maxFileSize': 'Maksimum dosya boyutu: 10MB',
   'import.guideline.supportedFormats': 'Desteklenen formatlar: .xlsx, .xls',
   'import.guideline.dataStartRow': 'Veriler 2. satırdan başlamalı (başlıklar için 1. satır)',
-  'import.guideline.requiredColumnsPresent': 'Tüm gerekli sütunlar bulunmalı'
+  'import.guideline.requiredColumnsPresent': 'Tüm gerekli sütunlar bulunmalı',
+  
+  // Logout
+  'action.logout': 'Oturum Kapat'
   },
   en: {
     // Navigation
@@ -462,7 +465,10 @@ const translations = {
     'import.guideline.maxFileSize': 'Maximum file size: 10MB',
     'import.guideline.supportedFormats': 'Supported formats: .xlsx, .xls',
     'import.guideline.dataStartRow': 'Data should start from row 2 (row 1 for headers)',
-    'import.guideline.requiredColumnsPresent': 'All required columns must be present'
+    'import.guideline.requiredColumnsPresent': 'All required columns must be present',
+    
+    // Logout
+    'action.logout': 'Logout'
   }
 };
 

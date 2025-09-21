@@ -8,8 +8,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
+import { useTranslation } from "@/lib/i18n";
 
 export default function Header() {
+  const { t } = useTranslation();
   return (
     <header className="bg-card border-b border-border card-shadow">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -37,13 +39,13 @@ export default function Header() {
                 <DropdownMenuItem asChild>
                   <Link href="/settings" className="flex items-center cursor-pointer" data-testid="link-settings">
                     <Settings className="mr-2 h-4 w-4" />
-                    Ayarlar
+                    {t('nav.settings')}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="flex items-center cursor-pointer text-red-600" data-testid="button-logout">
                   <LogOut className="mr-2 h-4 w-4" />
-                  Oturum Kapat
+                  {t('action.logout')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

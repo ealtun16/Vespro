@@ -88,17 +88,17 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     <Card className="card-shadow mb-8">
       <CardContent className="p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4" data-testid="text-import-title">
-          Excel Maliyet Analizi Yükle
+          {t('import.uploadTitle')}
         </h2>
         <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
           <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
             <FileSpreadsheet className="text-2xl text-accent h-6 w-6" />
           </div>
           <p className="text-lg font-medium text-foreground mb-2" data-testid="text-upload-title">
-            Excel Maliyet Analizi Yükle
+            {t('import.uploadTitle')}
           </p>
           <p className="text-sm text-muted-foreground mb-4" data-testid="text-upload-description">
-            Birden fazla Excel dosyasını aynı anda seçebilirsiniz
+            {t('import.uploadDescription')}
           </p>
           <div className="flex justify-center space-x-4">
             <Button 
@@ -108,7 +108,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
               data-testid="button-choose-files"
             >
               <Upload className="mr-2 h-4 w-4" />
-              {uploading ? 'Yükleniyor...' : 'Dosyaları Seç'}
+              {uploading ? t('import.uploading') : t('import.chooseFiles')}
             </Button>
             <input
               id="file-input"
@@ -120,7 +120,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
             />
           </div>
           <p className="text-xs text-muted-foreground mt-4" data-testid="text-supported-formats">
-            Desteklenen formatlar: .xlsx, .xls (Maks 10MB)
+            {t('import.supportedFormats')}
           </p>
         </div>
       </CardContent>

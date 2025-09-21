@@ -59,11 +59,9 @@ export default function CostAnalysisTable({
     }
   };
 
-  const viewReport = (reportId: string) => {
-    toast({
-      title: "View Report",
-      description: `Opening report ${reportId}`,
-    });
+  const viewReport = (analysisId: string) => {
+    // Navigate to cost analysis detail page
+    window.location.href = `/cost-analysis/${analysisId}`;
   };
 
   const editReport = (reportId: string) => {
@@ -214,7 +212,7 @@ export default function CostAnalysisTable({
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            onClick={() => viewReport(analysis.reportId)}
+                            onClick={() => viewReport(analysis.id)}
                             className="text-primary hover:text-primary/80"
                             data-testid={`button-view-${analysis.id}`}
                           >

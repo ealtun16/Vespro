@@ -9,6 +9,7 @@ import Dashboard from "@/pages/dashboard";
 import ImportData from "@/pages/import-data";
 import TankSpecifications from "@/pages/tank-specifications";
 import CostAnalysis from "@/pages/cost-analysis";
+import CostAnalysisDetail from "@/pages/cost-analysis-detail";
 import Reports from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
@@ -21,6 +22,7 @@ function Router() {
         <Route path="/import" component={ImportData} />
         <Route path="/tank-specifications" component={TankSpecifications} />
         <Route path="/cost-analysis" component={CostAnalysis} />
+        <Route path="/cost-analysis/:id" component={CostAnalysisDetail} />
         <Route path="/reports" component={Reports} />
         <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />

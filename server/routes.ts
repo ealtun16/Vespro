@@ -128,16 +128,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get individual cost analysis detail
   app.get("/api/cost-analyses/:id", async (req, res) => {
     try {
-      const analysis = await storage.getCostAnalysisWithDetails(req.params.id);
+      const { id } = req.params;
+      const analysis = await storage.getCostAnalysisWithDetails(id);
+      
       if (!analysis) {
         return res.status(404).json({ message: "Cost analysis not found" });
       }
+      
       res.json(analysis);
     } catch (error) {
-      console.error("Error fetching cost analysis:", error);
-      res.status(500).json({ message: "Failed to fetch cost analysis" });
+      console.error("Error fetching cost analysis detail:", error);
+      res.status(500).json({ message: "Failed to fetch cost analysis detail" });
     }
   });
 

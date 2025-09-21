@@ -354,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const defaultSettings = await storage.createSettings({
           settingsType: "global",
           language: "tr",
-          currency: "USD"
+          currency: "EUR"
         });
         return res.json(defaultSettings);
       }

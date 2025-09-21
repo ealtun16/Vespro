@@ -20,7 +20,6 @@ export default function Sidebar() {
     { href: "/tank-specifications", label: "Tank Özellikleri", icon: Factory },
     { href: "/cost-analysis", label: "Maliyet Analizi", icon: BarChart3 },
     { href: "/reports", label: "Raporlar", icon: FileSpreadsheet },
-    { href: "/settings", label: "Ayarlar", icon: Settings },
   ];
 
   return (

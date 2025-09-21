@@ -189,6 +189,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Download original Excel file
+  app.get("/api/vespro-forms/:id/download", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const allForms = await storage.getAllVesproForms();
+      const form = allForms.find(f => f.form_id === id);
+      
+      if (!form) {
+        return res.status(404).json({ message: "Vespro form not found" });
+      }
+      
+      if (!form.file_data || !form.original_filename) {
+        return res.status(404).json({ message: "Original Excel file not found" });
+      }
+      
+      // Decode base64 file data
+      const fileBuffer = Buffer.from(form.file_data, 'base64');
+      
+      // Set proper headers for Excel file download
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${form.original_filename}"`);
+      res.setHeader('Content-Length', fileBuffer.length);
+      
+      // Send the file
+      res.send(fileBuffer);
+      
+    } catch (error) {
+      console.error("Error downloading Excel file:", error);
+      res.status(500).json({ message: "Failed to download Excel file" });
+    }
+  });
+
   // Get individual vespro form content for file viewing
   app.get("/api/vespro-forms/:id/content", async (req, res) => {
     try {
@@ -242,9 +274,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sheet = workbook.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(sheet);
 
-      // Process the Excel data - this is a basic example
-      // You would need to customize this based on your Excel file structure
-      const processed = await processExcelData(data);
+      // Process the Excel data with file storage
+      const processed = await processExcelData(data, req.file.buffer, req.file.originalname);
       
       // Auto-analysis trigger for Excel imports
       let autoAnalysisResults: any[] = [];
@@ -477,7 +508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-async function processExcelData(data: any[]): Promise<any[]> {
+async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: string): Promise<any[]> {
   const processed: any[] = [];
   
   // Handle Turkish Excel structure
@@ -498,6 +529,9 @@ async function processExcelData(data: any[]): Promise<any[]> {
     const tankType = rawData[2]?.__EMPTY_2 || rawData[2]?.[2] || 'Imported Type';
     const materialGrade = rawData[2]?.__EMPTY_6 || rawData[2]?.[6];
 
+    // Prepare file data for storage
+    const fileData = fileBuffer ? fileBuffer.toString('base64') : null;
+    
     // Create a vespro form for this import
     const vesproForm = await storage.createVesproForm({
       form_code: String(formCode),
@@ -524,6 +558,9 @@ async function processExcelData(data: any[]): Promise<any[]> {
           materialGrade
         }
       },
+      // Store original Excel file
+      original_filename: filename || 'imported_file.xlsx',
+      file_data: fileData,
     });
 
     // Process cost items starting from row 8 (index 7)

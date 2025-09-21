@@ -41,6 +41,9 @@ export const vespro_forms = vespro.table("forms", {
   calculated_values: jsonb("calculated_values").default(sql`'{}'::jsonb`),
   notes: text("notes"),
   metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  // File storage for original Excel files
+  original_filename: text("original_filename"), // Store original Excel filename
+  file_data: text("file_data"), // Store base64 encoded Excel file data
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

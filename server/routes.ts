@@ -209,11 +209,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Set proper headers for Excel file download
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename="${form.original_filename}"`);
-      res.setHeader('Content-Length', fileBuffer.length);
+      res.setHeader('Content-Disposition', `inline; filename="${form.original_filename}"`); // Use inline to view in browser
+      res.setHeader('Content-Length', fileBuffer.length.toString());
+      res.setHeader('Cache-Control', 'no-cache');
       
-      // Send the file
-      res.send(fileBuffer);
+      // Send the file buffer
+      res.end(fileBuffer);
       
     } catch (error) {
       console.error("Error downloading Excel file:", error);

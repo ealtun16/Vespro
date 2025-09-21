@@ -68,16 +68,29 @@ export default function ImportData() {
         }
       }
       
-      // Create blob and download
+      // Create blob and open in new tab (for viewing in browser)
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      
+      // Open Excel file in new tab
+      const newTab = window.open(url, '_blank');
+      if (newTab) {
+        // Set title for the new tab
+        newTab.document.title = filename;
+      } else {
+        // Fallback to download if popup blocked
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      
+      // Clean up the URL after some time
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
       
       toast({
         title: 'İndirme başarılı',

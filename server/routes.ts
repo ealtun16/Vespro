@@ -5,6 +5,7 @@ import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterial
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { CostAnalysisEngine } from "./cost-analysis-engine";
+import { AutoAnalysisTriggers } from "./auto-analysis-triggers";
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -65,7 +66,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertTankSpecificationSchema.parse(req.body);
       const spec = await storage.createTankSpecification(validatedData);
-      res.status(201).json(spec);
+      
+      // Auto-analysis trigger for manual tank creation
+      let autoAnalysisResult = null;
+      try {
+        autoAnalysisResult = await AutoAnalysisTriggers.triggerManualCreationAnalysis(spec.id);
+      } catch (error) {
+        console.error('Error in manual creation auto-analysis trigger:', error);
+      }
+      
+      res.status(201).json({
+        ...spec,
+        autoAnalysis: autoAnalysisResult
+      });
     } catch (error) {
       console.error("Error creating tank specification:", error);
       res.status(400).json({ message: "Invalid tank specification data" });
@@ -211,9 +224,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // You would need to customize this based on your Excel file structure
       const processed = await processExcelData(data);
       
+      // Auto-analysis trigger for Excel imports
+      let autoAnalysisResults: any[] = [];
+      try {
+        // Use the exact processed forms instead of relying on getAllVesproForms ordering
+        if (processed && Array.isArray(processed) && processed.length > 0) {
+          for (const processedItem of processed) {
+            if (processedItem && processedItem.createdForm) {
+              const result = await AutoAnalysisTriggers.triggerExcelImportAnalysis(processedItem.createdForm);
+              autoAnalysisResults.push({
+                formId: processedItem.createdForm.form_id,
+                formCode: processedItem.createdForm.form_code,
+                analysisResult: result
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error in auto-analysis trigger:', error);
+      }
+      
       res.json({ 
         message: "File imported successfully", 
-        recordsProcessed: processed.length 
+        recordsProcessed: processed.length,
+        autoAnalysisResults,
+        autoAnalysisCount: autoAnalysisResults.filter(r => r.analysisResult.success).length
       });
     } catch (error) {
       console.error("Error importing Excel file:", error);
@@ -514,6 +549,7 @@ async function processExcelData(data: any[]): Promise<any[]> {
 
     processed.push({
       form: vesproForm,
+      createdForm: vesproForm, // Add explicit createdForm reference for auto-analysis triggers
       costItems: costItems.length
     });
 

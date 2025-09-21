@@ -37,6 +37,8 @@ const translations = {
   'import.noRecords': 'Henüz kayıt yok',
   'import.startByUploading': 'Excel dosyası yükleyerek başlayın',
   'import.processedCount': '{{count}} kayıt işlendi',
+  'import.uploadSuccess': 'Yükleme başarılı',
+  'import.uploadSuccessDescription': 'Dosya başarıyla yüklendi ve işlendi',
   'import.guidelinesTitle': 'İçe Aktarma Kuralları',
   'import.requiredColumns': 'Gerekli Excel Sütunları:',
   'import.optionalColumns': 'İsteğe Bağlı Sütunlar:',

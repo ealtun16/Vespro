@@ -189,6 +189,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get individual vespro form content for file viewing
+  app.get("/api/vespro-forms/:id/content", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const form = await storage.getVesproForm(id);
+      
+      if (!form) {
+        return res.status(404).json({ message: "Vespro form not found" });
+      }
+      
+      res.json(form);
+    } catch (error) {
+      console.error("Error fetching vespro form content:", error);
+      res.status(500).json({ message: "Failed to fetch vespro form content" });
+    }
+  });
+
   app.get("/api/vespro-forms/:id", async (req, res) => {
     try {
       const form = await storage.getVesproForm(req.params.id);
@@ -342,8 +359,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newSettings);
     } catch (error) {
       console.error('Error creating settings:', error);
-      if (error.name === 'ZodError') {
-        res.status(400).json({ error: 'Invalid settings data', details: error.issues });
+      if (error instanceof Error && error.name === 'ZodError') {
+        res.status(400).json({ error: 'Invalid settings data', details: (error as any).issues });
       } else {
         res.status(500).json({ error: 'Failed to create settings' });
       }
@@ -414,13 +431,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Step 2: Calculate costs using AI engine
       const costBreakdown = await CostAnalysisEngine.calculateCosts({
-        tankSpec: { ...tankSpecData, id: createdTank.id },
+        tankSpec: { ...createdTank },
         settings: globalSettings
       });
 
       // Step 3: Generate and save auto cost analysis
       const autoCostAnalysis = CostAnalysisEngine.generateAutoCostAnalysis(
-        { ...tankSpecData, id: createdTank.id }, 
+        { ...createdTank }, 
         costBreakdown
       );
       
@@ -438,10 +455,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('AI Full Analysis error:', error);
-      if (error.name === 'ZodError') {
+      if (error instanceof Error && error.name === 'ZodError') {
         res.status(400).json({ 
           error: 'Invalid tank specification data', 
-          details: error.issues 
+          details: (error as any).issues 
         });
       } else {
         res.status(500).json({ error: 'Failed to complete full analysis' });
@@ -528,8 +545,8 @@ async function processExcelData(data: any[]): Promise<any[]> {
       if (maliyetFaktoru && birimFiyat && parseFloat(String(birimFiyat)) > 0) {
         costItems.push({
           form_id: vesproForm.form_id,
-          group_no: grupNo ? parseInt(String(grupNo)) : 1,
-          seq_no: siraNo ? parseInt(String(siraNo)) : costItems.length + 1,
+          group_no: grupNo && !isNaN(parseInt(String(grupNo))) ? parseInt(String(grupNo)) : 1,
+          seq_no: siraNo && !isNaN(parseInt(String(siraNo))) ? parseInt(String(siraNo)) : costItems.length + 1,
           cost_factor: String(maliyetFaktoru),
           material_quality: malzemeKalitesi ? String(malzemeKalitesi) : null,
           material_type: malzemeTipi ? String(malzemeTipi) : null,

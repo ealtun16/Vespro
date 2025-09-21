@@ -16,52 +16,73 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
   const { t } = useTranslation();
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
 
-    if (!file.name.match(/\.(xlsx|xls)$/)) {
+    // Validate all files are Excel files
+    const invalidFiles = files.filter(file => !file.name.match(/\.(xlsx|xls)$/));
+    if (invalidFiles.length > 0) {
       toast({
         title: t('toast.invalidFileType'),
-        description: t('toast.invalidFileDescription'),
+        description: `${t('toast.invalidFileDescription')} - ${invalidFiles.map(f => f.name).join(', ')}`,
         variant: "destructive",
       });
       return;
     }
 
     setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
+    let successCount = 0;
+    let errorCount = 0;
 
     try {
-      const response = await apiRequest('POST', '/api/import/excel', formData);
-      const result = await response.json();
-      
-      toast({
-        title: t('toast.uploadSuccess'),
-        description: t('import.processedCount', { count: result.recordsProcessed }),
-      });
-      
-      if (onUploadSuccess) {
+      // Process files one by one to maintain individual file names
+      for (const file of files) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+
+          const response = await apiRequest('POST', '/api/import/excel', formData);
+          
+          if (response.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        } catch (error) {
+          console.error(`Error uploading ${file.name}:`, error);
+          errorCount++;
+        }
+      }
+
+      // Show result toast
+      if (successCount > 0 && errorCount === 0) {
+        toast({
+          title: t('toast.uploadSuccess'),
+          description: `${successCount} dosya başarıyla yüklendi`,
+        });
+      } else if (successCount > 0 && errorCount > 0) {
+        toast({
+          title: 'Kısmi başarı',
+          description: `${successCount} dosya yüklendi, ${errorCount} dosya başarısız`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: t('toast.uploadFailed'),
+          description: 'Tüm dosyalar yüklenemedi',
+          variant: "destructive",
+        });
+      }
+
+      if (onUploadSuccess && successCount > 0) {
         onUploadSuccess();
       }
-    } catch (error) {
-      toast({
-        title: t('toast.uploadFailed'),
-        description: t('toast.uploadFailedDescription'),
-        variant: "destructive",
-      });
     } finally {
       setUploading(false);
       event.target.value = '';
     }
   };
 
-  const handleBulkImport = () => {
-    toast({
-      title: t('toast.featureComingSoon'),
-      description: t('toast.featureComingSoonDescription'),
-    });
-  };
 
   return (
     <Card className="card-shadow mb-8">
@@ -77,7 +98,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
             {t('import.uploadTitle')}
           </p>
           <p className="text-sm text-muted-foreground mb-4" data-testid="text-upload-description">
-            {t('import.uploadDescription')}
+            Birden fazla Excel dosyasını aynı anda seçebilirsiniz
           </p>
           <div className="flex justify-center space-x-4">
             <Button 
@@ -87,23 +108,16 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
               data-testid="button-choose-files"
             >
               <Upload className="mr-2 h-4 w-4" />
-              {uploading ? t('import.uploading') : t('import.chooseFiles')}
+              {uploading ? 'Yükleniyor...' : 'Dosyaları Seç'}
             </Button>
             <input
               id="file-input"
               type="file"
               accept=".xlsx,.xls"
+              multiple
               onChange={handleFileUpload}
               style={{ display: 'none' }}
             />
-            <Button 
-              className="bg-accent text-accent-foreground hover:bg-accent/90"
-              onClick={handleBulkImport}
-              data-testid="button-bulk-import"
-            >
-              <FolderOpen className="mr-2 h-4 w-4" />
-              {t('import.bulkImport')}
-            </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-4" data-testid="text-supported-formats">
             {t('import.supportedFormats')}

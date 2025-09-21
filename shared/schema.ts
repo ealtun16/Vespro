@@ -206,7 +206,7 @@ export const settings = pgTable("settings", {
   steelPricePerKg: decimal("steel_price_per_kg", { precision: 10, scale: 2 }).default("2.50"), // EUR per kg
   hourlyLaborRate: decimal("hourly_labor_rate", { precision: 10, scale: 2 }).default("25.00"), // EUR per hour
   overheadPercentage: decimal("overhead_percentage", { precision: 5, scale: 2 }).default("15.00"), // 15%
-  // Currency exchange rates (base currency is USD)
+  // Currency exchange rates (base currency is EUR)
   eurToUsdRate: decimal("eur_to_usd_rate", { precision: 8, scale: 4 }).default("1.0800"),
   tryToUsdRate: decimal("try_to_usd_rate", { precision: 8, scale: 4 }).default("0.0300"),
   // AI analysis preferences

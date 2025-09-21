@@ -199,8 +199,8 @@ const translations = {
   'settings.cost.materialMultiplier': 'Malzeme Maliyet Çarpanı',
   'settings.cost.laborMultiplier': 'İşçilik Maliyet Çarpanı',
   'settings.cost.overheadMultiplier': 'Genel Gider Çarpanı',
-  'settings.cost.steelPrice': 'Çelik Fiyatı (USD/kg)',
-  'settings.cost.laborRate': 'Saatlik İşçilik Ücreti (USD)',
+  'settings.cost.steelPrice': 'Çelik Fiyatı (EUR/kg)',
+  'settings.cost.laborRate': 'Saatlik İşçilik Ücreti (EUR)',
   'settings.cost.overheadPercent': 'Genel Gider Yüzdesi (%)',
   
   // AI Analysis Settings
@@ -216,10 +216,10 @@ const translations = {
   'import.guideline.tankName': 'Tank Adı - Tank için açıklayıcı ad',
   'import.guideline.capacity': 'Kapasite - Tank kapasitesi litre cinsinden',
   'import.guideline.height': 'Yükseklik - Tank yüksekliği milimetre cinsinden',
-  'import.guideline.materialCost': 'Malzeme Maliyeti - USD cinsinden malzeme maliyeti',
-  'import.guideline.laborCost': 'İşçilik Maliyeti - USD cinsinden işçilik maliyetleri',
-  'import.guideline.overheadCost': 'Genel Gider - USD cinsinden genel gider maliyetleri',
-  'import.guideline.totalCost': 'Toplam Maliyet - USD cinsinden toplam proje maliyeti',
+  'import.guideline.materialCost': 'Malzeme Maliyeti - EUR cinsinden malzeme maliyeti',
+  'import.guideline.laborCost': 'İşçilik Maliyeti - EUR cinsinden işçilik maliyetleri',
+  'import.guideline.overheadCost': 'Genel Gider - EUR cinsinden genel gider maliyetleri',
+  'import.guideline.totalCost': 'Toplam Maliyet - EUR cinsinden toplam proje maliyeti',
   
   // Import Guidelines - Optional Columns  
   'import.guideline.material': 'Malzeme - Çelik kalitesi veya malzeme türü',
@@ -433,8 +433,8 @@ const translations = {
     'settings.cost.materialMultiplier': 'Material Cost Multiplier',
     'settings.cost.laborMultiplier': 'Labor Cost Multiplier',
     'settings.cost.overheadMultiplier': 'Overhead Cost Multiplier',
-    'settings.cost.steelPrice': 'Steel Price (USD/kg)',
-    'settings.cost.laborRate': 'Hourly Labor Rate (USD)',
+    'settings.cost.steelPrice': 'Steel Price (EUR/kg)',
+    'settings.cost.laborRate': 'Hourly Labor Rate (EUR)',
     'settings.cost.overheadPercent': 'Overhead Percentage (%)',
     
     // AI Analysis Settings
@@ -450,10 +450,10 @@ const translations = {
     'import.guideline.tankName': 'Tank Name - Descriptive name for tank',
     'import.guideline.capacity': 'Capacity - Tank capacity in liters',
     'import.guideline.height': 'Height - Tank height in millimeters',
-    'import.guideline.materialCost': 'Material Cost - Material cost in USD',
-    'import.guideline.laborCost': 'Labor Cost - Labor costs in USD',
-    'import.guideline.overheadCost': 'Overhead Cost - Overhead costs in USD',
-    'import.guideline.totalCost': 'Total Cost - Total project cost in USD',
+    'import.guideline.materialCost': 'Material Cost - Material cost in EUR',
+    'import.guideline.laborCost': 'Labor Cost - Labor costs in EUR',
+    'import.guideline.overheadCost': 'Overhead Cost - Overhead costs in EUR',
+    'import.guideline.totalCost': 'Total Cost - Total project cost in EUR',
     
     // Import Guidelines - Optional Columns  
     'import.guideline.material': 'Material - Steel grade or material type',

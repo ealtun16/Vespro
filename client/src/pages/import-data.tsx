@@ -36,8 +36,8 @@ export default function ImportData() {
     await refetch();
     
     toast({
-      title: t('import.uploadSuccess'),
-      description: t('import.uploadSuccessDescription'),
+      title: 'Yükleme başarılı',
+      description: 'Dosya başarıyla yüklendi ve işlendi',
     });
   };
 
@@ -111,10 +111,10 @@ export default function ImportData() {
     <div className="space-y-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground" data-testid="text-page-title">
-          {t('import.title')}
+          Veri İçe Aktarma
         </h1>
         <p className="mt-2 text-sm text-muted-foreground" data-testid="text-page-description">
-          {t('import.subtitle')}
+          Tank maliyet analizi verilerini içeren Excel dosyalarını içe aktarın
         </p>
       </div>
 
@@ -125,26 +125,26 @@ export default function ImportData() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            {t('import.importedRecords')}
+            İçe Aktarılan Kayıtlar
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-              <p className="mt-2 text-sm text-muted-foreground">{t('import.loadingRecords')}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Kayıtlar yükleniyor...</p>
             </div>
           ) : vesproForms && Array.isArray(vesproForms) && vesproForms.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{t('table.formTitle')}</TableHead>
-                    <TableHead>{t('table.tankName')}</TableHead>
-                    <TableHead>{t('table.tankType')}</TableHead>
-                    <TableHead>{t('table.currency')}</TableHead>
-                    <TableHead>{t('table.importDate')}</TableHead>
-                    <TableHead>{t('table.actions')}</TableHead>
+                    <TableHead>Form Başlığı</TableHead>
+                    <TableHead>Tank Adı</TableHead>
+                    <TableHead>Tank Tipi</TableHead>
+                    <TableHead>Para Birimi</TableHead>
+                    <TableHead>İçe Aktarma Tarihi</TableHead>
+                    <TableHead>İşlemler</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -154,7 +154,7 @@ export default function ImportData() {
                         {form.form_title}
                       </TableCell>
                       <TableCell data-testid={`text-tank-name-${form.form_id}`}>
-                        {form.tank_name || t('status.unspecified')}
+                        {form.tank_name || 'Belirtilmemiş'}
                       </TableCell>
                       <TableCell data-testid={`text-tank-type-${form.form_id}`}>
                         {form.tank_type && (
@@ -175,7 +175,7 @@ export default function ImportData() {
                           data-testid={`button-view-${form.form_id}`}
                         >
                           <ExternalLink className="h-4 w-4 mr-1" />
-                          {t('action.view')}
+                          Görüntüle
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -186,8 +186,8 @@ export default function ImportData() {
           ) : (
             <div className="text-center py-8">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-              <p className="text-muted-foreground">{t('import.noRecords')}</p>
-              <p className="text-sm text-muted-foreground">{t('import.startByUploading')}</p>
+              <p className="text-muted-foreground">Henüz kayıt yok</p>
+              <p className="text-sm text-muted-foreground">Excel dosyası yükleyerek başlayın</p>
             </div>
           )}
         </CardContent>
@@ -196,11 +196,11 @@ export default function ImportData() {
       <Card className="card-shadow">
         <CardContent className="p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4" data-testid="import-guidelines-title">
-            {t('import.guidelinesTitle')}
+            İçe Aktarma Kuralları
           </h2>
           <div className="space-y-4 text-sm text-muted-foreground">
             <div>
-              <h3 className="font-medium text-foreground mb-2">{t('import.requiredColumns')}</h3>
+              <h3 className="font-medium text-foreground mb-2">Gerekli Excel Sütunları:</h3>
               <ul className="list-disc pl-5 space-y-1">
                 <li>{t('import.guideline.reportId')}</li>
                 <li>{t('import.guideline.tankType')}</li>
@@ -214,7 +214,7 @@ export default function ImportData() {
               </ul>
             </div>
             <div>
-              <h3 className="font-medium text-foreground mb-2">{t('import.optionalColumns')}</h3>
+              <h3 className="font-medium text-foreground mb-2">İsteğe Bağlı Sütunlar:</h3>
               <ul className="list-disc pl-5 space-y-1">
                 <li>{t('import.guideline.material')}</li>
                 <li>{t('import.guideline.thickness')}</li>
@@ -223,7 +223,7 @@ export default function ImportData() {
               </ul>
             </div>
             <div>
-              <h3 className="font-medium text-foreground mb-2">{t('import.fileRequirements')}</h3>
+              <h3 className="font-medium text-foreground mb-2">Dosya Gereksinimleri:</h3>
               <ul className="list-disc pl-5 space-y-1">
                 <li>{t('import.guideline.maxFileSize')}</li>
                 <li>{t('import.guideline.supportedFormats')}</li>

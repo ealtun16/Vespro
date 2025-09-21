@@ -15,12 +15,12 @@ export default function Sidebar() {
   const { t } = useTranslation();
   
   const navItems = [
-    { href: "/", label: t('nav.dashboard'), icon: LayoutDashboard },
-    { href: "/import", label: t('nav.import'), icon: Upload },
-    { href: "/tank-specifications", label: t('nav.tankSpecs'), icon: Factory },
-    { href: "/cost-analysis", label: t('nav.costAnalysis'), icon: BarChart3 },
-    { href: "/reports", label: t('nav.reports'), icon: FileSpreadsheet },
-    { href: "/settings", label: t('nav.settings'), icon: Settings },
+    { href: "/", label: "Gösterge Paneli", icon: LayoutDashboard },
+    { href: "/import", label: "Veri İçe Aktarma", icon: Upload },
+    { href: "/tank-specifications", label: "Tank Özellikleri", icon: Factory },
+    { href: "/cost-analysis", label: "Maliyet Analizi", icon: BarChart3 },
+    { href: "/reports", label: "Raporlar", icon: FileSpreadsheet },
+    { href: "/settings", label: "Ayarlar", icon: Settings },
   ];
 
   return (

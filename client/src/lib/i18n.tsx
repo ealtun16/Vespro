@@ -234,7 +234,235 @@ const translations = {
   'import.guideline.requiredColumnsPresent': 'Tüm gerekli sütunlar bulunmalı'
   },
   en: {
-    // English translations can be added later
+    // Navigation
+    'nav.dashboard': 'Dashboard',
+    'nav.import': 'Import Data',
+    'nav.tankSpecs': 'Tank Specifications',
+    'nav.costAnalysis': 'Cost Analysis',
+    'nav.reports': 'Reports',
+    'nav.settings': 'Settings',
+
+    // Dashboard
+    'dashboard.title': 'Dashboard',
+    'dashboard.subtitle': 'Overview of tank cost analysis system',
+    'dashboard.stats.totalReports': 'Total Reports',
+    'dashboard.stats.tankModels': 'Tank Models',
+    'dashboard.stats.avgCost': 'Average Cost',
+    'dashboard.stats.monthlyReports': 'Monthly Reports',
+    'dashboard.recentAnalyses': 'Recent Analyses',
+    'dashboard.costDistribution': 'Cost Distribution',
+    'dashboard.viewAll': 'View All',
+
+    // Import Page
+    'import.title': 'Import Data',
+    'import.subtitle': 'Import Excel files containing tank cost analysis data',
+    'import.uploadTitle': 'Upload Excel Cost Analysis',
+    'import.uploadDescription': 'Select multiple Excel files to upload at once',
+    'import.chooseFiles': 'Choose Files',
+    'import.bulkImport': 'Bulk Import',
+    'import.supportedFormats': 'Supported formats: .xlsx, .xls (Max 10MB)',
+    'import.uploading': 'Uploading...',
+    'import.guidelines': 'Import Guidelines',
+    'import.importedRecords': 'Imported Records',
+    'import.loadingRecords': 'Loading records...',
+    'import.noRecords': 'No records yet',
+    'import.startByUploading': 'Start by uploading an Excel file',
+    'import.processedCount': '{{count}} records processed',
+    'import.uploadSuccess': 'Upload successful',
+    'import.uploadSuccessDescription': 'File uploaded and processed successfully',
+    'import.guidelinesTitle': 'Import Guidelines',
+    'import.requiredColumns': 'Required Excel Columns:',
+    'import.optionalColumns': 'Optional Columns:',
+    'import.fileRequirements': 'File Requirements:',
+
+    // Activity Messages
+    'activity.reportUploaded': 'New cost analysis report uploaded: {{id}}',
+    'activity.tankUpdated': 'Tank specifications updated: {{name}}',
+    'activity.excelExported': 'Excel export completed: {{filename}}',
+    'activity.backupCompleted': 'System backup completed successfully',
+    'activity.recentActivity': 'Recent Activity',
+
+    // Time
+    'time.hoursAgo': '{{count}} hours ago',
+    'time.hourAgo': '1 hour ago',
+
+    // Table Headers  
+    'table.formTitle': 'Form Title',
+    'table.tankName': 'Tank Name',
+    'table.tankType': 'Tank Type',
+    'table.currency': 'Currency',
+    'table.importDate': 'Import Date',
+    'table.actions': 'Actions',
+    'table.reportId': 'Report ID',
+    'table.analysisDate': 'Analysis Date',
+    'table.totalCost': 'Total Cost',
+    'table.capacity': 'Capacity',
+    'table.material': 'Material',
+
+    // Actions
+    'action.view': 'View',
+    'action.edit': 'Edit',
+    'action.delete': 'Delete',
+    'action.export': 'Export',
+    'action.analyze': 'Analyze',
+    'action.download': 'Download',
+    'action.print': 'Print',
+    'action.backToList': 'Back to List',
+
+    // Cost Analysis Page
+    'costAnalysis.title': 'Cost Analysis',
+    'costAnalysis.subtitle': 'View and manage cost analysis reports for tank projects',
+    'costAnalysis.detailTitle': 'Cost Analysis Details',
+    'costAnalysis.detailSubtitle': 'Comprehensive cost analysis report',
+    'costAnalysis.searchPlaceholder': 'Search by report ID or tank name...',
+    'costAnalysis.filterByTankType': 'Filter by Tank Type',
+    'costAnalysis.allTankTypes': 'All Tank Types',
+    'costAnalysis.noResults': 'No results found',
+    'costAnalysis.noResultsDescription': 'Try changing your search criteria',
+    'costAnalysis.exportSuccess': 'Export successful',
+    'costAnalysis.exportSuccessDescription': 'Cost analysis data exported to Excel',
+    'costAnalysis.exportFailed': 'Export failed',
+    'costAnalysis.exportFailedDescription': 'Failed to export to Excel',
+
+    // Cost Breakdown
+    'costBreakdown.title': 'Cost Breakdown',
+    'costBreakdown.materialCost': 'Material Cost',
+    'costBreakdown.laborCost': 'Labor Cost',
+    'costBreakdown.overheadCost': 'Overhead Cost',
+    'costBreakdown.totalCost': 'Total Cost',
+    'costBreakdown.currency': 'Currency',
+    'costBreakdown.percentage': 'Percentage',
+    'costBreakdown.amount': 'Amount',
+
+    // Tank Information
+    'tankInfo.title': 'Tank Information',
+    'tankInfo.name': 'Tank Name',
+    'tankInfo.type': 'Tank Type',
+    'tankInfo.capacity': 'Capacity',
+    'tankInfo.dimensions': 'Dimensions',
+    'tankInfo.height': 'Height',
+    'tankInfo.diameter': 'Diameter',
+    'tankInfo.width': 'Width',
+    'tankInfo.material': 'Material',
+    'tankInfo.pressure': 'Pressure',
+    'tankInfo.temperature': 'Temperature',
+
+    // Analysis Information
+    'analysisInfo.title': 'Analysis Information',
+    'analysisInfo.reportId': 'Report ID',
+    'analysisInfo.analysisDate': 'Analysis Date',
+    'analysisInfo.createdDate': 'Created Date',
+    'analysisInfo.lastUpdated': 'Last Updated',
+    'analysisInfo.notes': 'Notes',
+    'analysisInfo.autoGenerated': 'Auto generated',
+    'analysisInfo.manuallyCreated': 'Manually created',
+
+    // Auto Analysis
+    'autoAnalysis.title': 'Auto Analysis',
+    'autoAnalysis.triggered': 'Auto analysis triggered',
+    'autoAnalysis.source': 'Source',
+    'autoAnalysis.excelImport': 'Excel Import',
+    'autoAnalysis.manualEntry': 'Manual Entry',
+    'autoAnalysis.settings': 'Settings',
+    'autoAnalysis.enabled': 'Enabled',
+    'autoAnalysis.disabled': 'Disabled',
+
+    // Status & Messages
+    'status.loading': 'Loading...',
+    'status.noData': 'No data found',
+    'status.error': 'Error occurred',
+    'status.success': 'Successful',
+    'status.failed': 'Failed',
+    'status.unspecified': 'Unspecified',
+
+    // Toasts
+    'toast.uploadSuccess': 'File uploaded successfully',
+    'toast.uploadFailed': 'Upload failed',
+    'toast.invalidFileType': 'Invalid file type',
+    'toast.invalidFileDescription': 'Please upload an Excel file (.xlsx or .xls)',
+    'toast.uploadFailedDescription': 'Failed to upload and process Excel file',
+    'toast.fileTooLarge': 'File too large',
+    'toast.featureComingSoon': 'Feature coming soon',
+    'toast.featureComingSoonDescription': 'Bulk import feature will be available soon',
+
+    // Cost Analysis
+    'cost.materialCost': 'Material Cost',
+    'cost.laborCost': 'Labor Cost',
+    'cost.overheadCost': 'Overhead Cost',
+    'cost.totalCost': 'Total Cost',
+
+    // Tank Types
+    'tankType.storageTank': 'Storage Tank',
+    'tankType.pressureVessel': 'Pressure Vessel',
+    'tankType.heatExchanger': 'Heat Exchanger',
+
+    // Common
+    'common.search': 'Search',
+    'common.filter': 'Filter',
+    'common.sort': 'Sort',
+    'common.date': 'Date',
+    'common.name': 'Name',
+    'common.type': 'Type',
+    'common.description': 'Description',
+    'common.notes': 'Notes',
+    'common.cancel': 'Cancel',
+    'common.save': 'Save',
+    'common.close': 'Close',
+
+    // Settings Page
+    'settings.subtitle': 'Manage system settings and configure cost analysis parameters',
+    'settings.updateSuccess': 'Settings updated successfully',
+    'settings.updateFailed': 'Failed to update settings',
+    'settings.notFound': 'Settings not found',
+    
+    // Language Settings
+    'settings.language.title': 'Language and Localization',
+    'settings.language.label': 'Interface Language',
+    
+    // Currency Settings
+    'settings.currency.title': 'Currency Settings',
+    'settings.currency.primary': 'Primary Currency',
+    'settings.currency.eurRate': 'EUR/USD Rate',
+    'settings.currency.tryRate': 'TRY/USD Rate',
+    
+    // Cost Calculation Settings
+    'settings.cost.title': 'Cost Calculation Parameters',
+    'settings.cost.materialMultiplier': 'Material Cost Multiplier',
+    'settings.cost.laborMultiplier': 'Labor Cost Multiplier',
+    'settings.cost.overheadMultiplier': 'Overhead Cost Multiplier',
+    'settings.cost.steelPrice': 'Steel Price (USD/kg)',
+    'settings.cost.laborRate': 'Hourly Labor Rate (USD)',
+    'settings.cost.overheadPercent': 'Overhead Percentage (%)',
+    
+    // AI Analysis Settings
+    'settings.ai.title': 'AI Analysis Settings',
+    'settings.ai.autoAnalysis': 'Auto Analysis',
+    'settings.ai.autoAnalysisDescription': 'Automatically analyze new records for cost analysis',
+    'settings.ai.confidenceThreshold': 'Confidence Threshold',
+    'settings.ai.confidenceDescription': 'Minimum confidence level for analysis results (0-1)',
+    
+    // Import Guidelines - Required Columns
+    'import.guideline.reportId': 'Report ID - Unique identifier for cost analysis',
+    'import.guideline.tankType': 'Tank Type - Storage Tank, Pressure Vessel or Heat Exchanger',
+    'import.guideline.tankName': 'Tank Name - Descriptive name for tank',
+    'import.guideline.capacity': 'Capacity - Tank capacity in liters',
+    'import.guideline.height': 'Height - Tank height in millimeters',
+    'import.guideline.materialCost': 'Material Cost - Material cost in USD',
+    'import.guideline.laborCost': 'Labor Cost - Labor costs in USD',
+    'import.guideline.overheadCost': 'Overhead Cost - Overhead costs in USD',
+    'import.guideline.totalCost': 'Total Cost - Total project cost in USD',
+    
+    // Import Guidelines - Optional Columns  
+    'import.guideline.material': 'Material - Steel grade or material type',
+    'import.guideline.thickness': 'Thickness - Wall thickness in millimeters',
+    'import.guideline.pressure': 'Pressure - Operating pressure in bar',
+    'import.guideline.temperature': 'Temperature - Operating temperature in Celsius',
+    
+    // Import Guidelines - File Requirements
+    'import.guideline.maxFileSize': 'Maximum file size: 10MB',
+    'import.guideline.supportedFormats': 'Supported formats: .xlsx, .xls',
+    'import.guideline.dataStartRow': 'Data should start from row 2 (row 1 for headers)',
+    'import.guideline.requiredColumnsPresent': 'All required columns must be present'
   }
 };
 

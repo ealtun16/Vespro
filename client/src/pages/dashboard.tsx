@@ -19,10 +19,10 @@ export default function Dashboard() {
       {/* Page Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground" data-testid="text-page-title">
-          Gösterge Paneli
+          {t('dashboard.title')}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground" data-testid="text-page-description">
-          Tank maliyet analizi sistemine genel bakış
+          {t('dashboard.subtitle')}
         </p>
       </div>
 
@@ -35,7 +35,7 @@ export default function Dashboard() {
       {/* Recent Cost Analyses */}
       <div className="mt-8">
         <h2 className="text-lg font-semibold text-foreground mb-4" data-testid="text-recent-analyses">
-          Son Analizler
+          {t('dashboard.recentAnalyses')}
         </h2>
         <CostAnalysisTable 
           data={costAnalysesData} 
@@ -47,43 +47,43 @@ export default function Dashboard() {
       {/* Recent Activity */}
       <div className="mt-8 bg-card rounded-lg border border-border p-6 card-shadow">
         <h2 className="text-lg font-semibold text-foreground mb-4" data-testid="recent-activity-title">
-          Son Aktiviteler
+          {t('activity.recentActivity')}
         </h2>
         <div className="space-y-4">
           <div className="flex items-center space-x-3">
             <div className="w-2 h-2 bg-success rounded-full"></div>
             <span className="text-sm text-foreground" data-testid="activity-item-1">
-              Yeni maliyet analizi raporu yüklendi: TCA-2024-005
+              {t('activity.reportUploaded', { id: 'TCA-2024-005' })}
             </span>
             <span className="text-xs text-muted-foreground ml-auto" data-testid="activity-time-1">
-              2 saat önce
+              {t('time.hoursAgo', { count: '2' })}
             </span>
           </div>
           <div className="flex items-center space-x-3">
             <div className="w-2 h-2 bg-accent rounded-full"></div>
             <span className="text-sm text-foreground" data-testid="activity-item-2">
-              Tank özellikleri güncellendi: Depolama Tankı 3000L
+              {t('activity.tankUpdated', { name: 'Depolama Tankı 3000L' })}
             </span>
             <span className="text-xs text-muted-foreground ml-auto" data-testid="activity-time-2">
-              4 saat önce
+              {t('time.hoursAgo', { count: '4' })}
             </span>
           </div>
           <div className="flex items-center space-x-3">
             <div className="w-2 h-2 bg-primary rounded-full"></div>
             <span className="text-sm text-foreground" data-testid="activity-item-3">
-              Excel dışa aktarma tamamlandı: Aylik_Maliyet_Raporu.xlsx
+              {t('activity.excelExported', { filename: 'Aylik_Maliyet_Raporu.xlsx' })}
             </span>
             <span className="text-xs text-muted-foreground ml-auto" data-testid="activity-time-3">
-              6 saat önce
+              {t('time.hoursAgo', { count: '6' })}
             </span>
           </div>
           <div className="flex items-center space-x-3">
             <div className="w-2 h-2 bg-secondary rounded-full"></div>
             <span className="text-sm text-foreground" data-testid="activity-item-4">
-              Sistem yedekleme başarıyla tamamlandı
+              {t('activity.backupCompleted')}
             </span>
             <span className="text-xs text-muted-foreground ml-auto" data-testid="activity-time-4">
-              8 saat önce
+              {t('time.hoursAgo', { count: '8' })}
             </span>
           </div>
         </div>

@@ -1,0 +1,64 @@
+Sen bir veri mühendisisin. Amaç: PostgreSQL şemasındaki hataları düzelt ve yüklenen Excel (sheet: EV1) verisini doğru tablolara import et. Aşamaları sırasıyla ve güvenli şekilde yap. Çalışırken anlaşılır, madde madde rapor üret.
+
+Bağlam:
+- Tablolar: settings, users, materials, tank_specifications, cost_analyses, cost_analysis_materials
+- Yaygın hatalar:
+  1) id sütunları uuid değil ve/veya default 'gen_random_uuid()' şeklinde tırnaklı string
+  2) numeric sütun default’ları tırnak içinde ('1.000' gibi)
+  3) FK sütunları uuid değil
+
+Gereksinimler:
+1) Teşhis Raporu:
+   - Her tablo için kolon adı, veri tipi, default, PK/FK listesi.
+   - Hata maddelerini açıkça işaretle.
+
+2) Yedek + Migration Planı:
+   - Önce hızlı bir yedek al (dump yolu ve adı).
+   - Sonra transaction içinde uygulanacak planı yaz:
+     * CREATE EXTENSION IF NOT EXISTS pgcrypto;
+     * Tüm tablolarda id → uuid + DEFAULT gen_random_uuid(). Gerekirse id_uuid ekle, doldur, PK taşı, eski id’yi sil, id_uuid’u id olarak yeniden adlandır.
+     * settings’te numeric default’ları tırnaksız 1.0 yap.
+     * FK sütunlarını uuid tipine çevir ve FK kısıtlarını yeniden kur.
+
+3) Migration Uygulama:
+   - Planı uygula; başarısız olursa rollback ve ayrıntılı hata yaz.
+
+4) Excel Mapping (sheet: EV1):
+   - Hücre eşlemesi:
+     * I2 → tank_specifications.diameter_mm
+     * K2 → tank_specifications.cylinder_length_mm
+     * H3 → tank_specifications.volume_m3
+     * I3 → tank_specifications.quality
+     * K3 → tank_specifications.pressure_bar  (metinden sayıyı çek)
+     * P3 → tank_specifications.total_weight_kg
+     * P2 → cost_analyses.selling_price
+   - Ondalık ayracı normalizasyonu yap (virgül/nokta).
+   - Önizleme JSON üret ve göster.
+
+5) Kayıt Ekleme:
+   - tank_specifications’ta yeni satır oluştur (uuid default ile).
+   - cost_analyses’te tank_spec_id FK ile kayıt oluştur; currency = settings.currency (yoksa 'EUR'), created_at = now().
+   - Eklenen UUID’leri yazdır ve SELECT ile kontrol çıktısı ver.
+
+6) (Opsiyonel) Malzeme Kalemleri:
+   - EV1 içinde 8–40 satır, J–U sütun bandında malzeme satırlarını tespit etmeye çalış.
+   - Alanlar: name/spec (string), unit (örn 'kg'), quantity (sayısal), unit_price (sayısal), line_total (sayısal).
+   - materials’ta upsert et; cost_analysis_materials ile ilişkilendir (cost_analysis_id, material_id, quantity, unit, unit_price, line_total).
+   - Kaç satır eklendi/bağlandı raporu ver ve 3 örnek satır göster.
+
+7) Son Doğrulama:
+   - Şema: id/uuid + default’lar + FK tutarlılığı PASSED/FAILED
+   - Eklenen kayıtlar: tank_specifications, cost_analyses (UUID’leriyle)
+   - Malzeme sonuçları (varsa)
+   - Olası manuel düzenleme önerileri (kısa).
+
+Varsayımlar:
+- Veritabanı bağlantısı hazır (DATABASE_URL). Yoksa önce sadece “Teşhis Raporu”nu çalıştır ve bağlantı iste.
+- Excel dosyası yüklenmiş ve erişilebilir. Değilse işlemi durdur, net bir hata mesajı ver.
+
+Çıktı Biçimi:
+- Her aşamayı başlıklandır (“1) Teşhis”, “2) Yedek + Plan”, …).
+- Her başlık altında kısa açıklama + yapılanlar + sonuç (ve kısa SQL/komut özeti).
+- En sonda 10 satırı geçmeyen “Özet” bloğu.
+
+Hedef: Şemayı kalıcı olarak düzelt, Excel’den gelen veriyi doğru alanlara ve doğru tiplerle yaz, sonrasında tekrarlanabilir bir akış bırak.

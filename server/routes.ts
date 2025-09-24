@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Excel Import route
+  // Excel Import route (Multi-sheet support)
   app.post("/api/import/excel", upload.single('file'), async (req: MulterRequest, res) => {
     try {
       if (!req.file) {
@@ -271,24 +271,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(sheet);
-
-      // Process the Excel data with file storage
-      const processed = await processExcelData(data, req.file.buffer, req.file.originalname);
+      const allProcessed: any[] = [];
       
-      // Auto-analysis trigger for Excel imports
+      console.log(`Processing Excel file with ${workbook.SheetNames.length} sheets: ${workbook.SheetNames.join(', ')}`);
+
+      // Process each sheet as a separate cost analysis report
+      for (const sheetName of workbook.SheetNames) {
+        try {
+          const sheet = workbook.Sheets[sheetName];
+          const data = XLSX.utils.sheet_to_json(sheet);
+          
+          console.log(`Processing sheet: ${sheetName} with ${data.length} rows`);
+          
+          // Process each sheet with unique identifier
+          const processed = await processExcelData(data, req.file.buffer, req.file.originalname, sheetName);
+          allProcessed.push(...processed);
+          
+        } catch (sheetError) {
+          console.error(`Error processing sheet ${sheetName}:`, sheetError);
+          // Continue with other sheets even if one fails
+        }
+      }
+      
+      // Auto-analysis trigger for all sheets
       let autoAnalysisResults: any[] = [];
       try {
-        // Use the exact processed forms instead of relying on getAllVesproForms ordering
-        if (processed && Array.isArray(processed) && processed.length > 0) {
-          for (const processedItem of processed) {
+        if (allProcessed && Array.isArray(allProcessed) && allProcessed.length > 0) {
+          for (const processedItem of allProcessed) {
             if (processedItem && processedItem.createdForm) {
               const result = await AutoAnalysisTriggers.triggerExcelImportAnalysis(processedItem.createdForm);
               autoAnalysisResults.push({
                 formId: processedItem.createdForm.form_id,
                 formCode: processedItem.createdForm.form_code,
+                sheetName: processedItem.sheetName || 'Unknown',
                 analysisResult: result
               });
             }
@@ -299,8 +314,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json({ 
-        message: "File imported successfully", 
-        recordsProcessed: processed.length,
+        message: `File imported successfully - processed ${workbook.SheetNames.length} sheets`, 
+        sheetsProcessed: workbook.SheetNames,
+        totalRecordsProcessed: allProcessed.length,
         autoAnalysisResults,
         autoAnalysisCount: autoAnalysisResults.filter(r => r.analysisResult.success).length
       });
@@ -509,7 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   return httpServer;
 }
 
-async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: string): Promise<any[]> {
+async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: string, sheetName?: string): Promise<any[]> {
   const processed: any[] = [];
   
   // Handle Turkish Excel structure
@@ -523,8 +539,9 @@ async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: str
   try {
     // Extract header information from Excel (rows 1-3)
     const formTitle = rawData[0]?.__EMPTY_2 || rawData[0]?.[2] || 'MALİYET ANALİZ FORMU';
-    const formCode = rawData[1]?.__EMPTY_2 || rawData[1]?.[2] || `IMP-${Date.now()}`;
-    const tankName = rawData[1]?.__EMPTY_5 || rawData[1]?.[5] || 'Imported Tank';
+    const baseFormCode = rawData[1]?.__EMPTY_2 || rawData[1]?.[2] || `IMP-${Date.now()}`;
+    const formCode = sheetName ? `${baseFormCode}-${sheetName}` : baseFormCode;
+    const tankName = rawData[1]?.__EMPTY_5 || rawData[1]?.[5] || (sheetName || 'Imported Tank');
     const tankWidth = rawData[1]?.__EMPTY_7 || rawData[1]?.[7];
     const tankHeight = rawData[1]?.__EMPTY_9 || rawData[1]?.[9];
     const tankType = rawData[2]?.__EMPTY_2 || rawData[2]?.[2] || 'Imported Type';
@@ -597,6 +614,14 @@ async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: str
         return !isNaN(num) && isFinite(num);
       };
 
+      // Helper function to validate UOM values
+      const validateUOM = (value: any): string => {
+        if (!value) return 'kg'; // default
+        const str = String(value).trim().toLowerCase();
+        const validUOMs = ['kg', 'adet', 'm', 'mm', 'm2', 'm3', 'set', 'pcs', 'other'];
+        return validUOMs.includes(str) ? str : 'kg'; // fallback to kg
+      };
+
       // Only process rows with meaningful data and valid numeric prices
       if (maliyetFaktoru && 
           isValidNumber(birimFiyat) && 
@@ -613,7 +638,7 @@ async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: str
           dim_c_thickness_mm: ebatC && isValidNumber(ebatC) ? String(ebatC) : null,
           quantity: adet && isValidNumber(adet) ? String(adet) : '1',
           total_qty: toplamMiktar && isValidNumber(toplamMiktar) ? String(toplamMiktar) : (adet && isValidNumber(adet) ? String(adet) : '1'),
-          qty_uom: birim ? String(birim) : 'kg',
+          qty_uom: validateUOM(birim),
           unit_price_eur: String(parseFloat(String(birimFiyat))),
           total_price_eur: toplamFiyat && isValidNumber(toplamFiyat) ? String(parseFloat(String(toplamFiyat))) : String(parseFloat(String(birimFiyat))),
         });
@@ -629,7 +654,8 @@ async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: str
     processed.push({
       form: vesproForm,
       createdForm: vesproForm, // Add explicit createdForm reference for auto-analysis triggers
-      costItems: costItems.length
+      costItems: costItems.length,
+      sheetName: sheetName || 'Unknown'
     });
 
   } catch (error) {

@@ -580,23 +580,36 @@ async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: str
       const birimFiyat = row.__EMPTY_12 || row[12];
       const toplamFiyat = row.__EMPTY_13 || row[13];
 
-      // Only process rows with meaningful data
-      if (maliyetFaktoru && birimFiyat && parseFloat(String(birimFiyat)) > 0) {
+      // Helper function to check if value is numeric
+      const isValidNumber = (value: any): boolean => {
+        if (value === null || value === undefined || value === '') return false;
+        const str = String(value).trim();
+        if (str === '') return false;
+        // Skip Turkish headers or text entries
+        if (str.includes('GİDER') || str.includes('MALIYET') || str.includes('TOPLAM')) return false;
+        const num = parseFloat(str);
+        return !isNaN(num) && isFinite(num);
+      };
+
+      // Only process rows with meaningful data and valid numeric prices
+      if (maliyetFaktoru && 
+          isValidNumber(birimFiyat) && 
+          parseFloat(String(birimFiyat)) > 0) {
         costItems.push({
           form_id: vesproForm.form_id,
-          group_no: grupNo && !isNaN(parseInt(String(grupNo))) ? parseInt(String(grupNo)) : 1,
-          seq_no: siraNo && !isNaN(parseInt(String(siraNo))) ? parseInt(String(siraNo)) : costItems.length + 1,
+          group_no: grupNo && isValidNumber(grupNo) ? parseInt(String(grupNo)) : 1,
+          seq_no: siraNo && isValidNumber(siraNo) ? parseInt(String(siraNo)) : costItems.length + 1,
           cost_factor: String(maliyetFaktoru),
           material_quality: malzemeKalitesi ? String(malzemeKalitesi) : null,
           material_type: malzemeTipi ? String(malzemeTipi) : null,
-          dim_a_mm: ebatA && !isNaN(Number(ebatA)) ? String(ebatA) : null,
-          dim_b_mm: ebatB && !isNaN(Number(ebatB)) ? String(ebatB) : null,
-          dim_c_thickness_mm: ebatC && !isNaN(Number(ebatC)) ? String(ebatC) : null,
-          quantity: adet ? String(adet) : '1',
-          total_qty: toplamMiktar ? String(toplamMiktar) : String(adet || 1),
+          dim_a_mm: ebatA && isValidNumber(ebatA) ? String(ebatA) : null,
+          dim_b_mm: ebatB && isValidNumber(ebatB) ? String(ebatB) : null,
+          dim_c_thickness_mm: ebatC && isValidNumber(ebatC) ? String(ebatC) : null,
+          quantity: adet && isValidNumber(adet) ? String(adet) : '1',
+          total_qty: toplamMiktar && isValidNumber(toplamMiktar) ? String(toplamMiktar) : (adet && isValidNumber(adet) ? String(adet) : '1'),
           qty_uom: birim ? String(birim) : 'kg',
-          unit_price_eur: String(birimFiyat),
-          total_price_eur: toplamFiyat ? String(toplamFiyat) : String(birimFiyat),
+          unit_price_eur: String(parseFloat(String(birimFiyat))),
+          total_price_eur: toplamFiyat && isValidNumber(toplamFiyat) ? String(parseFloat(String(toplamFiyat))) : String(parseFloat(String(birimFiyat))),
         });
       }
     }

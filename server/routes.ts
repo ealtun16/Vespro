@@ -464,13 +464,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Step 2: Calculate costs using AI engine
       const costBreakdown = await CostAnalysisEngine.calculateCosts({
-        tankSpec: createdTank,
+        tankSpec: {
+          ...createdTank,
+          features: createdTank.features as any
+        },
         settings: globalSettings
       });
 
       // Step 3: Generate and save auto cost analysis
       const autoCostAnalysis = CostAnalysisEngine.generateAutoCostAnalysis(
-        createdTank, 
+        {
+          ...createdTank,
+          features: createdTank.features as any
+        }, 
         costBreakdown
       );
       

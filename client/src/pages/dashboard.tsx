@@ -30,6 +30,7 @@ import {
   Plus,
   Trash2,
   Eye,
+  Edit,
   Database,
   Calculator,
   FileText,
@@ -95,6 +96,8 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState<any>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editingAnalysis, setEditingAnalysis] = useState<any>(null);
   const { toast } = useToast();
 
   // Fetch Turkish cost analyses
@@ -158,8 +161,7 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/turkish-cost-analyses"] });
-      setOpen(false);
-      form.reset();
+      closeDialog();
       refetchAnalyses();
       toast({
         title: "Başarılı",
@@ -195,8 +197,119 @@ export default function Dashboard() {
     },
   });
 
+  const updateAnalysisMutation = useMutation({
+    mutationFn: async (data: TurkishCostAnalysisFormData) => {
+      console.log("Updating Turkish cost analysis data:", data);
+      const response = await apiRequest("PUT", `/api/turkish-cost-analyses/${editingAnalysis.id}`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turkish-cost-analyses"] });
+      closeDialog();
+      refetchAnalyses();
+      toast({
+        title: "Başarılı",
+        description: "Türkçe maliyet analizi başarıyla güncellendi",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Turkish cost analysis update error:", error);
+      
+      let errorMessage = "Maliyet analizi güncellenemedi";
+      let errorDetails = "";
+
+      if (error?.response?.data) {
+        const errorData = error.response.data;
+        errorMessage = errorData.message || errorMessage;
+        errorDetails = errorData.details || "";
+        
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorDetails = errorData.errors.map((err: any) => 
+            `${err.path.join(' → ')}: ${err.message}`
+          ).join('\n');
+        }
+      } else if (error?.message) {
+        errorDetails = error.message;
+      }
+
+      toast({
+        title: "Hata",
+        description: errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: TurkishCostAnalysisFormData) => {
-    createAnalysisMutation.mutate(data);
+    if (editMode && editingAnalysis) {
+      updateAnalysisMutation.mutate(data);
+    } else {
+      createAnalysisMutation.mutate(data);
+    }
+  };
+
+  const closeDialog = () => {
+    setOpen(false);
+    setEditMode(false);
+    setEditingAnalysis(null);
+    form.reset();
+  };
+
+  const openCreateDialog = () => {
+    setEditMode(false);
+    setEditingAnalysis(null);
+    form.reset();
+    setOpen(true);
+  };
+
+  const openEditDialog = async (analysis: any) => {
+    try {
+      // Fetch full analysis data with items
+      const response = await apiRequest("GET", `/api/turkish-cost-analyses/${analysis.id}`);
+      const fullData = await response.json();
+      
+      setEditMode(true);
+      setEditingAnalysis(fullData.analysis);
+      
+      // Pre-populate form with existing data
+      form.reset({
+        form_code: fullData.analysis.form_code,
+        client_name: fullData.analysis.client_name,
+        form_title: fullData.analysis.form_title,
+        form_date: fullData.analysis.form_date,
+        revision_no: parseInt(fullData.analysis.revision_no) || 0,
+        currency: fullData.analysis.currency || "EUR",
+        tank_name: fullData.analysis.tank_name,
+        tank_capi: parseFloat(fullData.analysis.tank_capi) || 0,
+        silindirik_yukseklik: parseFloat(fullData.analysis.silindirik_yukseklik) || 0,
+        insulation: fullData.analysis.insulation,
+        karistirici: fullData.analysis.karistirici,
+        ceket_serpantin: fullData.analysis.ceket_serpantin,
+        volume: parseFloat(fullData.analysis.volume) || 0,
+        malzeme_kalitesi: fullData.analysis.malzeme_kalitesi,
+        basinc: fullData.analysis.basinc,
+        govde_acinimi: parseFloat(fullData.analysis.govde_acinimi) || 0,
+        sicaklik: parseFloat(fullData.analysis.sicaklik) || 0,
+        notes: fullData.analysis.notes || "",
+        cost_items: fullData.items.map((item: any) => ({
+          maliyet_faktoru: item.maliyet_faktoru,
+          malzeme_kalitesi_item: item.malzeme_kalitesi_item || "",
+          malzeme_tipi: item.malzeme_tipi || "",
+          adet: parseFloat(item.adet) || 0,
+          toplam_miktar: parseFloat(item.toplam_miktar) || 0,
+          birim: item.birim,
+          birim_fiyat_euro: parseFloat(item.birim_fiyat_euro) || 0,
+        }))
+      });
+      
+      setOpen(true);
+    } catch (error) {
+      toast({
+        title: "Hata", 
+        description: "Analiz verileri yüklenemedi",
+        variant: "destructive",
+      });
+    }
   };
 
   const addCostItem = () => {
@@ -245,16 +358,18 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={closeDialog}>
           <DialogTrigger asChild>
-            <Button size="lg" data-testid="button-create-analysis">
+            <Button size="lg" onClick={openCreateDialog} data-testid="button-create-analysis">
               <Plus className="mr-2 h-5 w-5" />
               Yeni Maliyet Analizi
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Yeni Türkçe Maliyet Analizi Formu</DialogTitle>
+              <DialogTitle>
+                {editMode ? "Maliyet Analizini Düzenle" : "Yeni Türkçe Maliyet Analizi Formu"}
+              </DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -681,11 +796,18 @@ export default function Dashboard() {
                 />
 
                 <div className="flex justify-end gap-4">
-                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                  <Button type="button" variant="outline" onClick={closeDialog}>
                     İptal
                   </Button>
-                  <Button type="submit" disabled={createAnalysisMutation.isPending} data-testid="button-submit-form">
-                    {createAnalysisMutation.isPending ? "Oluşturuluyor..." : "Analiz Oluştur"}
+                  <Button 
+                    type="submit" 
+                    disabled={createAnalysisMutation.isPending || updateAnalysisMutation.isPending} 
+                    data-testid="button-submit-form"
+                  >
+                    {editMode 
+                      ? (updateAnalysisMutation.isPending ? "Güncelleniyor..." : "Analizi Güncelle")
+                      : (createAnalysisMutation.isPending ? "Oluşturuluyor..." : "Analiz Oluştur")
+                    }
                   </Button>
                 </div>
               </form>
@@ -781,14 +903,24 @@ export default function Dashboard() {
                       {analysis.total_cost ? `€${parseFloat(analysis.total_cost).toFixed(2)}` : "-"}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => viewAnalysis(analysis.id)}
-                        data-testid={`button-view-${analysis.id}`}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => viewAnalysis(analysis.id)}
+                          data-testid={`button-view-${analysis.id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditDialog(analysis)}
+                          data-testid={`button-edit-${analysis.id}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

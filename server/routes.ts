@@ -329,7 +329,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Excel Export route
   app.get("/api/export/excel", async (req, res) => {
     try {
-      const { analyses } = await storage.getAllCostAnalyses(1, 1000); // Get all for export
+      // Limit export to prevent memory overflow - users can paginate if needed
+      const { analyses } = await storage.getAllCostAnalyses(1, 100); // Reduced limit to prevent memory issues
       
       const exportData = analyses.map((analysis: any) => ({
         'Report ID': analysis.reportId,

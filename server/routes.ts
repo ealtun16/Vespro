@@ -2,29 +2,10 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterialSchema, insertSettingsSchema } from "@shared/schema";
-import multer from "multer";
 import * as XLSX from "xlsx";
 import { CostAnalysisEngine } from "./cost-analysis-engine";
-import { AutoAnalysisTriggers } from "./auto-analysis-triggers";
 
-interface MulterRequest extends Request {
-  file?: Express.Multer.File;
-}
-
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-  fileFilter: (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-    if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-        file.mimetype === 'application/vnd.ms-excel') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only Excel files are allowed'));
-    }
-  }
-});
+// Multer upload configuration removed - replaced with manual data entry
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard stats
@@ -67,18 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertTankSpecificationSchema.parse(req.body);
       const spec = await storage.createTankSpecification(validatedData);
       
-      // Auto-analysis trigger for manual tank creation
-      let autoAnalysisResult = null;
-      try {
-        autoAnalysisResult = await AutoAnalysisTriggers.triggerManualCreationAnalysis(spec.id);
-      } catch (error) {
-        console.error('Error in manual creation auto-analysis trigger:', error);
-      }
-      
-      res.status(201).json({
-        ...spec,
-        autoAnalysis: autoAnalysisResult
-      });
+      res.status(201).json(spec);
     } catch (error) {
       console.error("Error creating tank specification:", error);
       res.status(400).json({ message: "Invalid tank specification data" });
@@ -178,151 +148,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Vespro Forms routes (for imported Excel data)
-  app.get("/api/vespro-forms", async (req, res) => {
-    try {
-      const forms = await storage.getAllVesproForms();
-      res.json(forms);
-    } catch (error) {
-      console.error("Error fetching vespro forms:", error);
-      res.status(500).json({ message: "Failed to fetch imported forms" });
-    }
-  });
+  // Vespro Forms routes removed - replaced with manual data entry
 
-  // Download original Excel file
-  app.get("/api/vespro-forms/:id/download", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const fileData = await storage.getVesproFormFileData(id);
-      
-      if (!fileData) {
-        return res.status(404).json({ message: "Vespro form not found" });
-      }
-      
-      if (!fileData.file_data || !fileData.original_filename) {
-        return res.status(404).json({ message: "Original Excel file not found" });
-      }
-      
-      // Decode base64 file data
-      const fileBuffer = Buffer.from(fileData.file_data, 'base64');
-      
-      // Set proper headers for Excel file download
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `inline; filename="${fileData.original_filename}"`); // Use inline to view in browser
-      res.setHeader('Content-Length', fileBuffer.length.toString());
-      res.setHeader('Cache-Control', 'no-cache');
-      
-      // Send the file buffer
-      res.end(fileBuffer);
-      
-    } catch (error) {
-      console.error("Error downloading Excel file:", error);
-      res.status(500).json({ message: "Failed to download Excel file" });
-    }
-  });
-
-  // Get individual vespro form content for file viewing
-  app.get("/api/vespro-forms/:id/content", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const form = await storage.getVesproFormComplete(id);
-      
-      if (!form) {
-        return res.status(404).json({ message: "Vespro form not found" });
-      }
-      
-      res.json(form);
-    } catch (error) {
-      console.error("Error fetching vespro form content:", error);
-      res.status(500).json({ message: "Failed to fetch vespro form content" });
-    }
-  });
-
-  app.get("/api/vespro-forms/:id", async (req, res) => {
-    try {
-      const form = await storage.getVesproForm(req.params.id);
-      if (!form) {
-        return res.status(404).json({ message: "Form not found" });
-      }
-      res.json(form);
-    } catch (error) {
-      console.error("Error fetching vespro form:", error);
-      res.status(500).json({ message: "Failed to fetch form" });
-    }
-  });
-
-  app.get("/api/vespro-forms/:id/cost-items", async (req, res) => {
-    try {
-      const costItems = await storage.getVesproFormCostItems(req.params.id);
-      res.json(costItems);
-    } catch (error) {
-      console.error("Error fetching form cost items:", error);
-      res.status(500).json({ message: "Failed to fetch cost items" });
-    }
-  });
-
-  // Excel Import route (Multi-sheet support)
-  app.post("/api/import/excel", upload.single('file'), async (req: MulterRequest, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-      const allProcessed: any[] = [];
-      
-      console.log(`Processing Excel file with ${workbook.SheetNames.length} sheets: ${workbook.SheetNames.join(', ')}`);
-
-      // Process each sheet as a separate cost analysis report
-      for (const sheetName of workbook.SheetNames) {
-        try {
-          const sheet = workbook.Sheets[sheetName];
-          const data = XLSX.utils.sheet_to_json(sheet);
-          
-          console.log(`Processing sheet: ${sheetName} with ${data.length} rows`);
-          
-          // Process each sheet with unique identifier
-          const processed = await processExcelData(data, req.file.buffer, req.file.originalname, sheetName);
-          allProcessed.push(...processed);
-          
-        } catch (sheetError) {
-          console.error(`Error processing sheet ${sheetName}:`, sheetError);
-          // Continue with other sheets even if one fails
-        }
-      }
-      
-      // Auto-analysis trigger for all sheets
-      let autoAnalysisResults: any[] = [];
-      try {
-        if (allProcessed && Array.isArray(allProcessed) && allProcessed.length > 0) {
-          for (const processedItem of allProcessed) {
-            if (processedItem && processedItem.createdForm) {
-              const result = await AutoAnalysisTriggers.triggerExcelImportAnalysis(processedItem.createdForm);
-              autoAnalysisResults.push({
-                formId: processedItem.createdForm.form_id,
-                formCode: processedItem.createdForm.form_code,
-                sheetName: processedItem.sheetName || 'Unknown',
-                analysisResult: result
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error in auto-analysis trigger:', error);
-      }
-      
-      res.json({ 
-        message: `File imported successfully - processed ${workbook.SheetNames.length} sheets`, 
-        sheetsProcessed: workbook.SheetNames,
-        totalRecordsProcessed: allProcessed.length,
-        autoAnalysisResults,
-        autoAnalysisCount: autoAnalysisResults.filter(r => r.analysisResult.success).length
-      });
-    } catch (error) {
-      console.error("Error importing Excel file:", error);
-      res.status(500).json({ message: "Failed to import Excel file" });
-    }
-  });
+  // Excel Import route removed - replaced with manual data entry
 
   // Excel Export route
   app.get("/api/export/excel", async (req, res) => {
@@ -555,10 +383,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vespro form routes for manual data entry
+  app.post('/api/vespro/forms', async (req, res) => {
+    try {
+      const vesproForm = await storage.createVesproForm(req.body);
+      res.json(vesproForm);
+    } catch (error) {
+      console.error('Error creating Vespro form:', error);
+      res.status(500).json({ error: 'Failed to create Vespro form' });
+    }
+  });
+
+  app.post('/api/vespro/cost-items', async (req, res) => {
+    try {
+      const { items } = req.body;
+      const costItems = await storage.createVesproCostItems(items);
+      res.json(costItems);
+    } catch (error) {
+      console.error('Error creating cost items:', error);
+      res.status(500).json({ error: 'Failed to create cost items' });
+    }
+  });
+
+  app.get('/api/vespro/forms', async (req, res) => {
+    try {
+      const forms = await storage.getAllVesproForms();
+      res.json(forms);
+    } catch (error) {
+      console.error('Error fetching Vespro forms:', error);
+      res.status(500).json({ error: 'Failed to fetch Vespro forms' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
 
+// processExcelData function removed - replaced with manual data entry
+
+/*
 async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: string, sheetName?: string): Promise<any[]> {
   const processed: any[] = [];
   
@@ -698,3 +561,4 @@ async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: str
   
   return processed;
 }
+*/

@@ -1,7 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { 
   BarChart3, 
-  Upload, 
   Settings, 
   FileSpreadsheet, 
   LayoutDashboard,
@@ -16,7 +15,6 @@ export default function Sidebar() {
   
   const navItems = [
     { href: "/", label: t('nav.dashboard'), icon: LayoutDashboard },
-    { href: "/import", label: t('nav.import'), icon: Upload },
     { href: "/tank-specifications", label: t('nav.tankSpecs'), icon: Factory },
     { href: "/cost-analysis", label: t('nav.costAnalysis'), icon: BarChart3 },
     { href: "/reports", label: t('nav.reports'), icon: FileSpreadsheet },

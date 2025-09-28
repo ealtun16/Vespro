@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "@/lib/i18n";
 import StatsCards from "@/components/cards/stats-cards";
-import FileUpload from "@/components/upload/file-upload";
 import CostAnalysisTable from "@/components/tables/cost-analysis-table";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Calculator } from "lucide-react";
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -29,8 +31,37 @@ export default function Dashboard() {
       {/* Stats Cards */}
       <StatsCards stats={stats} loading={statsLoading} />
 
-      {/* File Upload Section */}
-      <FileUpload />
+      {/* Manual Data Entry Section */}
+      <Card className="card-shadow mb-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2" data-testid="text-manual-entry-title">
+            <Calculator className="h-5 w-5" />
+            Manual Data Entry
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button 
+              className="h-24 flex flex-col items-center justify-center gap-2" 
+              variant="outline"
+              onClick={() => window.location.href = '/tank-specifications'}
+              data-testid="button-create-tank-spec"
+            >
+              <Plus className="h-6 w-6" />
+              <span>Create Tank Specification</span>
+            </Button>
+            <Button 
+              className="h-24 flex flex-col items-center justify-center gap-2" 
+              variant="outline"
+              onClick={() => window.location.href = '/cost-analysis'}
+              data-testid="button-create-cost-analysis"
+            >
+              <Calculator className="h-6 w-6" />
+              <span>Create Cost Analysis</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recent Cost Analyses */}
       <div className="mt-8">

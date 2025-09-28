@@ -16,15 +16,32 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const tankSpecSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  type: z.string().min(1, "Type is required"),
+  // Form Information (Mandatory)
+  name: z.string().min(1, "Tank name is required"),
+  type: z.string().min(1, "Tank type is required"),
+  
+  // Tank Specifications (Mandatory)
   capacity: z.number().min(1, "Capacity must be greater than 0"),
   height: z.number().min(1, "Height must be greater than 0"),
   diameter: z.number().optional(),
-  pressure: z.number().optional(),
-  temperature: z.number().optional(),
+  width: z.number().optional(),
+  
+  // Material Information (Mandatory)
   material: z.string().min(1, "Material is required"),
+  material_type: z.string().optional(),
+  material_grade: z.string().optional(),
   thickness: z.number().optional(),
+  
+  // Operating Conditions
+  pressure: z.number().optional(),
+  pressure_text: z.string().optional(),
+  temperature: z.number().optional(),
+  temperature_text: z.string().optional(),
+  
+  // Additional Fields
+  volume_calculated: z.number().optional(),
+  surface_area: z.number().optional(),
+  drawing_reference: z.string().optional(),
   features: z.string().optional(),
 });
 
@@ -47,6 +64,10 @@ export default function TankSpecifications() {
       capacity: 1000,
       height: 2000,
       material: "Steel",
+      material_type: "",
+      material_grade: "",
+      pressure_text: "",
+      temperature_text: "",
     },
   });
 
@@ -139,10 +160,18 @@ export default function TankSpecifications() {
       capacity: spec.capacity,
       height: spec.height,
       diameter: spec.diameter,
-      pressure: spec.pressure ? parseFloat(spec.pressure) : undefined,
-      temperature: spec.temperature ? parseFloat(spec.temperature) : undefined,
+      width: spec.width,
       material: spec.material,
+      material_type: spec.material_type || "",
+      material_grade: spec.material_grade || "",
+      pressure: spec.pressure ? parseFloat(spec.pressure) : undefined,
+      pressure_text: spec.pressure_text || "",
+      temperature: spec.temperature ? parseFloat(spec.temperature) : undefined,
+      temperature_text: spec.temperature_text || "",
       thickness: spec.thickness ? parseFloat(spec.thickness) : undefined,
+      volume_calculated: spec.volume_calculated ? parseFloat(spec.volume_calculated) : undefined,
+      surface_area: spec.surface_area ? parseFloat(spec.surface_area) : undefined,
+      drawing_reference: spec.drawing_reference || "",
       features: spec.features?.notes || "",
     });
     setOpen(true);
@@ -281,12 +310,18 @@ export default function TankSpecifications() {
                   />
                   <FormField
                     control={form.control}
-                    name="material"
+                    name="width"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Material</FormLabel>
+                        <FormLabel>Width (mm)</FormLabel>
                         <FormControl>
-                          <Input placeholder="Steel grade or material" {...field} data-testid="input-material" />
+                          <Input 
+                            type="number" 
+                            placeholder="Width in millimeters"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                            data-testid="input-width"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -294,7 +329,59 @@ export default function TankSpecifications() {
                   />
                 </div>
 
+                {/* Material Information Section */}
+                <div className="grid grid-cols-1 gap-4">
+                  <h3 className="text-lg font-semibold text-foreground">Material Information</h3>
+                </div>
+                
                 <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="material"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Material *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Steel, Aluminum, etc." {...field} data-testid="input-material" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="material_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Material Type</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., EVATHERM, SAÇ" {...field} data-testid="input-material-type" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="material_grade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Material Grade</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., 1.4410, super duplex" {...field} data-testid="input-material-grade" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Operating Conditions Section */}
+                <div className="grid grid-cols-1 gap-4">
+                  <h3 className="text-lg font-semibold text-foreground">Operating Conditions</h3>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="pressure"
@@ -317,6 +404,22 @@ export default function TankSpecifications() {
                   />
                   <FormField
                     control={form.control}
+                    name="pressure_text"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pressure Description</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., 0 BAR, Normal Pressure" {...field} data-testid="input-pressure-text" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
                     name="temperature"
                     render={({ field }) => (
                       <FormItem>
@@ -337,6 +440,22 @@ export default function TankSpecifications() {
                   />
                   <FormField
                     control={form.control}
+                    name="temperature_text"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Temperature Description</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., SICAKLIK, Room Temperature" {...field} data-testid="input-temperature-text" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
                     name="thickness"
                     render={({ field }) => (
                       <FormItem>
@@ -355,7 +474,66 @@ export default function TankSpecifications() {
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="volume_calculated"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Volume (m³)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.1"
+                            placeholder="Calculated volume"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                            data-testid="input-volume"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="surface_area"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Surface Area (m²)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.1"
+                            placeholder="Surface area"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                            data-testid="input-surface-area"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
+
+                {/* Additional Information Section */}
+                <div className="grid grid-cols-1 gap-4">
+                  <h3 className="text-lg font-semibold text-foreground">Additional Information</h3>
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="drawing_reference"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Drawing Reference</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., 1788V01-EV1" {...field} data-testid="input-drawing-reference" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -412,14 +590,14 @@ export default function TankSpecifications() {
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">Loading...</TableCell>
                 </TableRow>
-              ) : !specifications || specifications.length === 0 ? (
+              ) : !specifications || !Array.isArray(specifications) || specifications.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No tank specifications found
                   </TableCell>
                 </TableRow>
               ) : (
-                specifications?.map((spec: any) => (
+                Array.isArray(specifications) ? specifications.map((spec: any) => (
                   <TableRow key={spec.id} data-testid={`row-specification-${spec.id}`}>
                     <TableCell className="font-medium" data-testid={`text-name-${spec.id}`}>
                       {spec.name}
@@ -455,7 +633,7 @@ export default function TankSpecifications() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                )) : null
               )}
             </TableBody>
           </Table>

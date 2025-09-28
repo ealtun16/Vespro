@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/lib/i18n";
 import Layout from "@/components/layout/layout";
 import Dashboard from "@/pages/dashboard";
-import ImportData from "@/pages/import-data";
 import TankSpecifications from "@/pages/tank-specifications";
 import CostAnalysis from "@/pages/cost-analysis";
 import CostAnalysisDetail from "@/pages/cost-analysis-detail";
@@ -19,7 +18,6 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
-        <Route path="/import" component={ImportData} />
         <Route path="/tank-specifications" component={TankSpecifications} />
         <Route path="/cost-analysis" component={CostAnalysis} />
         <Route path="/cost-analysis/:id" component={CostAnalysisDetail} />

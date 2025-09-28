@@ -712,22 +712,17 @@ export default function Dashboard() {
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={form.control}
-                            render={() => (
-                              <FormItem>
-                                <FormLabel>Toplam Fiyat (€)</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    value={(form.watch(`cost_items.${index}.adet`) * form.watch(`cost_items.${index}.birim_fiyat_euro`)).toFixed(2)}
-                                    readOnly
-                                    className="bg-muted"
-                                    data-testid={`text-total-price-${index}`}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
+                          <div>
+                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                              Toplam Fiyat (€)
+                            </label>
+                            <Input 
+                              value={(form.watch(`cost_items.${index}.adet`) * form.watch(`cost_items.${index}.birim_fiyat_euro`)).toFixed(2)}
+                              readOnly
+                              className="bg-muted mt-2"
+                              data-testid={`text-total-price-${index}`}
+                            />
+                          </div>
                         </div>
                       </Card>
                     ))}

@@ -358,9 +358,47 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <Dialog open={open} onOpenChange={closeDialog}>
+        <Dialog open={open} onOpenChange={(isOpen) => {
+          if (isOpen && !editMode) {
+            // Opening for create mode - reset form
+            setEditMode(false);
+            setEditingAnalysis(null);
+            form.reset({
+              form_code: `TCA-${Date.now()}`,
+              client_name: "",
+              form_title: "TÜRKİYE MALİYET ANALİZ FORMU",
+              form_date: new Date().toISOString().split("T")[0],
+              revision_no: 0,
+              currency: "EUR",
+              tank_name: "",
+              tank_capi: 0,
+              silindirik_yukseklik: 0,
+              insulation: "yok",
+              karistirici: "yok",
+              ceket_serpantin: "yok",
+              volume: 0,
+              malzeme_kalitesi: "",
+              basinc: "",
+              govde_acinimi: 0,
+              sicaklik: 20,
+              notes: "",
+              cost_items: [
+                {
+                  maliyet_faktoru: "",
+                  malzeme_kalitesi_item: "",
+                  malzeme_tipi: "",
+                  adet: 0,
+                  toplam_miktar: 0,
+                  birim: "",
+                  birim_fiyat_euro: 0,
+                }
+              ],
+            });
+          }
+          setOpen(isOpen);
+        }}>
           <DialogTrigger asChild>
-            <Button size="lg" onClick={openCreateDialog} data-testid="button-create-analysis">
+            <Button size="lg" data-testid="button-create-analysis">
               <Plus className="mr-2 h-5 w-5" />
               Yeni Maliyet Analizi
             </Button>

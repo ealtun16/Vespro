@@ -213,8 +213,9 @@ export default function Dashboard() {
 
   const viewAnalysis = async (id: string) => {
     try {
-      const analysis = await apiRequest("GET", `/api/turkish-cost-analyses/${id}`);
-      setSelectedAnalysis(analysis);
+      const response = await apiRequest("GET", `/api/turkish-cost-analyses/${id}`);
+      const data = await response.json();
+      setSelectedAnalysis(data);
       setViewOpen(true);
     } catch (error) {
       toast({

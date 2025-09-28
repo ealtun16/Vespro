@@ -30,11 +30,11 @@ import {
   Plus,
   Trash2,
   Eye,
-  Edit,
   Database,
   Calculator,
   FileText,
 } from "lucide-react";
+import { Edit } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";

@@ -16,7 +16,6 @@ export default function Sidebar() {
   const navItems = [
     { href: "/", label: t('nav.dashboard'), icon: LayoutDashboard },
     { href: "/tank-specifications", label: t('nav.tankSpecs'), icon: Factory },
-    { href: "/cost-analysis", label: t('nav.costAnalysis'), icon: BarChart3 },
     { href: "/reports", label: t('nav.reports'), icon: FileSpreadsheet },
   ];
 

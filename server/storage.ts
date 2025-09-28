@@ -33,6 +33,9 @@ import {
 import { db } from "./db";
 import { eq, desc, like, and, or, sql } from "drizzle-orm";
 
+// Type for VesproForm without file_data (to prevent memory issues)
+type VesproFormWithoutFileData = Omit<VesproForm, 'file_data'>;
+
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
@@ -66,9 +69,11 @@ export interface IStorage {
   // Vespro methods for Excel import
   createVesproForm(form: InsertVesproForm): Promise<VesproForm>;
   createVesproCostItems(items: InsertVesproCostItem[]): Promise<VesproCostItem[]>;
-  getAllVesproForms(): Promise<VesproForm[]>;
-  getVesproForm(id: string): Promise<VesproForm | undefined>;
+  getAllVesproForms(): Promise<VesproFormWithoutFileData[]>; // Excludes file_data to prevent memory issues
+  getVesproForm(id: string): Promise<VesproFormWithoutFileData | undefined>; // Excludes file_data to prevent memory issues
   getVesproFormCostItems(formId: string): Promise<VesproCostItem[]>;
+  getVesproFormFileData(id: string): Promise<{ file_data: string | null; original_filename: string | null } | undefined>;
+  getVesproFormComplete(id: string): Promise<VesproForm | undefined>;
 
   // Dashboard stats
   getDashboardStats(): Promise<any>;
@@ -309,17 +314,88 @@ export class DatabaseStorage implements IStorage {
     return newItems;
   }
 
-  async getAllVesproForms(): Promise<VesproForm[]> {
-    return await db.select().from(vespro_forms).orderBy(desc(vespro_forms.created_at));
+  async getAllVesproForms(): Promise<VesproFormWithoutFileData[]> {
+    // Exclude large file_data field to prevent memory issues
+    return await db.select({
+      form_id: vespro_forms.form_id,
+      form_code: vespro_forms.form_code,
+      client_name: vespro_forms.client_name,
+      form_title: vespro_forms.form_title,
+      form_date: vespro_forms.form_date,
+      revision_no: vespro_forms.revision_no,
+      currency: vespro_forms.currency,
+      tank_name: vespro_forms.tank_name,
+      tank_type: vespro_forms.tank_type,
+      tank_width_mm: vespro_forms.tank_width_mm,
+      tank_height_mm: vespro_forms.tank_height_mm,
+      tank_diameter_mm: vespro_forms.tank_diameter_mm,
+      tank_volume: vespro_forms.tank_volume,
+      tank_surface_area: vespro_forms.tank_surface_area,
+      tank_material_type: vespro_forms.tank_material_type,
+      tank_material_grade: vespro_forms.tank_material_grade,
+      operating_pressure: vespro_forms.operating_pressure,
+      operating_temperature: vespro_forms.operating_temperature,
+      drawing_revision: vespro_forms.drawing_revision,
+      project_status: vespro_forms.project_status,
+      calculated_values: vespro_forms.calculated_values,
+      notes: vespro_forms.notes,
+      metadata: vespro_forms.metadata,
+      original_filename: vespro_forms.original_filename,
+      // file_data: excluded to prevent memory issues
+      created_at: vespro_forms.created_at,
+    }).from(vespro_forms).orderBy(desc(vespro_forms.created_at));
   }
 
-  async getVesproForm(id: string): Promise<VesproForm | undefined> {
-    const [form] = await db.select().from(vespro_forms).where(eq(vespro_forms.form_id, id));
+  async getVesproForm(id: string): Promise<VesproFormWithoutFileData | undefined> {
+    // Exclude large file_data field to prevent memory issues
+    const [form] = await db.select({
+      form_id: vespro_forms.form_id,
+      form_code: vespro_forms.form_code,
+      client_name: vespro_forms.client_name,
+      form_title: vespro_forms.form_title,
+      form_date: vespro_forms.form_date,
+      revision_no: vespro_forms.revision_no,
+      currency: vespro_forms.currency,
+      tank_name: vespro_forms.tank_name,
+      tank_type: vespro_forms.tank_type,
+      tank_width_mm: vespro_forms.tank_width_mm,
+      tank_height_mm: vespro_forms.tank_height_mm,
+      tank_diameter_mm: vespro_forms.tank_diameter_mm,
+      tank_volume: vespro_forms.tank_volume,
+      tank_surface_area: vespro_forms.tank_surface_area,
+      tank_material_type: vespro_forms.tank_material_type,
+      tank_material_grade: vespro_forms.tank_material_grade,
+      operating_pressure: vespro_forms.operating_pressure,
+      operating_temperature: vespro_forms.operating_temperature,
+      drawing_revision: vespro_forms.drawing_revision,
+      project_status: vespro_forms.project_status,
+      calculated_values: vespro_forms.calculated_values,
+      notes: vespro_forms.notes,
+      metadata: vespro_forms.metadata,
+      original_filename: vespro_forms.original_filename,
+      // file_data: excluded to prevent memory issues
+      created_at: vespro_forms.created_at,
+    }).from(vespro_forms).where(eq(vespro_forms.form_id, id));
     return form || undefined;
   }
 
   async getVesproFormCostItems(formId: string): Promise<VesproCostItem[]> {
     return await db.select().from(vespro_cost_items).where(eq(vespro_cost_items.form_id, formId));
+  }
+
+  // Method to get file data only when needed
+  async getVesproFormFileData(id: string): Promise<{ file_data: string | null; original_filename: string | null } | undefined> {
+    const [form] = await db.select({
+      file_data: vespro_forms.file_data,
+      original_filename: vespro_forms.original_filename,
+    }).from(vespro_forms).where(eq(vespro_forms.form_id, id));
+    return form || undefined;
+  }
+
+  // Method to get complete form with file data when specifically needed
+  async getVesproFormComplete(id: string): Promise<VesproForm | undefined> {
+    const [form] = await db.select().from(vespro_forms).where(eq(vespro_forms.form_id, id));
+    return form || undefined;
   }
 
   async getDashboardStats(): Promise<any> {

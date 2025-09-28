@@ -193,23 +193,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vespro-forms/:id/download", async (req, res) => {
     try {
       const { id } = req.params;
-      const allForms = await storage.getAllVesproForms();
-      const form = allForms.find(f => f.form_id === id);
+      const fileData = await storage.getVesproFormFileData(id);
       
-      if (!form) {
+      if (!fileData) {
         return res.status(404).json({ message: "Vespro form not found" });
       }
       
-      if (!form.file_data || !form.original_filename) {
+      if (!fileData.file_data || !fileData.original_filename) {
         return res.status(404).json({ message: "Original Excel file not found" });
       }
       
       // Decode base64 file data
-      const fileBuffer = Buffer.from(form.file_data, 'base64');
+      const fileBuffer = Buffer.from(fileData.file_data, 'base64');
       
       // Set proper headers for Excel file download
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `inline; filename="${form.original_filename}"`); // Use inline to view in browser
+      res.setHeader('Content-Disposition', `inline; filename="${fileData.original_filename}"`); // Use inline to view in browser
       res.setHeader('Content-Length', fileBuffer.length.toString());
       res.setHeader('Cache-Control', 'no-cache');
       
@@ -226,8 +225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vespro-forms/:id/content", async (req, res) => {
     try {
       const { id } = req.params;
-      const allForms = await storage.getAllVesproForms();
-      const form = allForms.find(f => f.form_id === id);
+      const form = await storage.getVesproFormComplete(id);
       
       if (!form) {
         return res.status(404).json({ message: "Vespro form not found" });

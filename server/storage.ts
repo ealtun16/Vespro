@@ -270,8 +270,8 @@ export class DatabaseStorage implements IStorage {
     // Filter and convert category types to valid values
     const validItems = items.map(item => ({
       ...item,
-      cat1_type: (item.cat1_type === 'ATOLYE_ISCILIK' || item.cat1_type === 'DIS_TEDARIK') ? item.cat1_type : null,
-      cat2_type: (item.cat2_type === 'ATOLYE_ISCILIK' || item.cat2_type === 'DIS_TEDARIK') ? item.cat2_type : null,
+      cat1_type: (item.cat1_type === 'ATOLYE_ISCILIK' || item.cat1_type === 'DIS_TEDARIK') ? item.cat1_type as "ATOLYE_ISCILIK" | "DIS_TEDARIK" : null,
+      cat2_type: (item.cat2_type === 'ATOLYE_ISCILIK' || item.cat2_type === 'DIS_TEDARIK') ? item.cat2_type as "ATOLYE_ISCILIK" | "DIS_TEDARIK" : null,
     }));
     const newItems = await db.insert(vespro_cost_items).values(validItems).returning();
     return newItems;

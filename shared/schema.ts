@@ -216,6 +216,60 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// NEW CLEAN SCHEMA FOR TURKISH COST ANALYSIS FORMS
+export const turkishCostAnalyses = pgTable("turkish_cost_analyses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Form Information
+  form_code: text("form_code").notNull(),
+  client_name: text("client_name").notNull(),
+  form_title: text("form_title").notNull(),
+  form_date: date("form_date").notNull(),
+  revision_no: integer("revision_no").default(0),
+  currency: text("currency").default("EUR"),
+  
+  // Turkish Tank Specifications
+  tank_name: text("tank_name").notNull(),
+  tank_capi: numeric("tank_capi").notNull(), // Tank çapı (mm)
+  silindirik_yukseklik: numeric("silindirik_yukseklik").notNull(), // Silindirik yükseklik (mm)
+  insulation: text("insulation").notNull(), // "var" or "yok"
+  karistirici: text("karistirici").notNull(), // "var" or "yok" 
+  ceket_serpantin: text("ceket_serpantin").notNull(), // "var" or "yok"
+  volume: numeric("volume").notNull(), // m³
+  malzeme_kalitesi: text("malzeme_kalitesi").notNull(), // Malzeme kalitesi
+  basinc: text("basinc").notNull(), // Basınç (Sami)
+  govde_acinimi: numeric("govde_acinimi").notNull(), // Gövde açınımı
+  sicaklik: numeric("sicaklik").notNull(), // Sıcaklık (°C)
+  
+  // Additional fields
+  notes: text("notes"),
+  
+  // Calculated totals
+  total_cost: numeric("total_cost", { precision: 12, scale: 2 }),
+  
+  // Timestamps
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+});
+
+export const turkishCostItems = pgTable("turkish_cost_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  analysis_id: varchar("analysis_id").notNull().references(() => turkishCostAnalyses.id, { onDelete: "cascade" }),
+  
+  // Turkish Cost Item Fields
+  maliyet_faktoru: text("maliyet_faktoru").notNull(), // MALİYET FAKTÖRÜ
+  malzeme_kalitesi_item: text("malzeme_kalitesi_item"), // MALZEME KALİTESİ (string or number as text)
+  malzeme_tipi: text("malzeme_tipi"), // MALZEME TİPİ
+  adet: numeric("adet").notNull(), // Adet
+  toplam_miktar: numeric("toplam_miktar").notNull(), // TOPLAM MİKTAR
+  birim: text("birim").notNull(), // BİRİM (kg, adet, m, m², m³, set)
+  birim_fiyat_euro: numeric("birim_fiyat_euro", { precision: 10, scale: 2 }).notNull(), // BİRİM FİYAT EURO
+  
+  // Calculated field
+  item_total_price: numeric("item_total_price", { precision: 12, scale: 2 }),
+  
+  created_at: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const tankSpecificationsRelations = relations(tankSpecifications, ({ many }) => ({
   costAnalyses: many(costAnalyses),
@@ -244,6 +298,18 @@ export const costAnalysisMaterialsRelations = relations(costAnalysisMaterials, (
   }),
 }));
 
+// New Turkish relations - defined after tables
+export const turkishCostAnalysesRelations = relations(turkishCostAnalyses, ({ many }) => ({
+  costItems: many(turkishCostItems),
+}));
+
+export const turkishCostItemsRelations = relations(turkishCostItems, ({ one }) => ({
+  analysis: one(turkishCostAnalyses, {
+    fields: [turkishCostItems.analysis_id],
+    references: [turkishCostAnalyses.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertTankSpecificationSchema = createInsertSchema(tankSpecifications).omit({ 
@@ -269,6 +335,20 @@ export const insertSettingsSchema = createInsertSchema(settings).omit({
   updatedAt: true 
 });
 
+// New Turkish schemas
+export const insertTurkishCostAnalysisSchema = createInsertSchema(turkishCostAnalyses).omit({ 
+  id: true, 
+  created_at: true, 
+  updated_at: true,
+  total_cost: true // Calculated field
+});
+
+export const insertTurkishCostItemSchema = createInsertSchema(turkishCostItems).omit({ 
+  id: true, 
+  created_at: true,
+  item_total_price: true // Calculated field
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -282,6 +362,12 @@ export type CostAnalysisMaterial = typeof costAnalysisMaterials.$inferSelect;
 export type InsertCostAnalysisMaterial = z.infer<typeof insertCostAnalysisMaterialSchema>;
 export type Settings = typeof settings.$inferSelect;
 export type InsertSettings = z.infer<typeof insertSettingsSchema>;
+
+// New Turkish types
+export type TurkishCostAnalysis = typeof turkishCostAnalyses.$inferSelect;
+export type InsertTurkishCostAnalysis = z.infer<typeof insertTurkishCostAnalysisSchema>;
+export type TurkishCostItem = typeof turkishCostItems.$inferSelect;
+export type InsertTurkishCostItem = z.infer<typeof insertTurkishCostItemSchema>;
 
 // Vespro insert schemas
 export const insertVesproFormSchema = createInsertSchema(vespro_forms).omit({ 

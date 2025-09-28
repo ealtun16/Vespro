@@ -329,31 +329,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Excel Export route
   app.get("/api/export/excel", async (req, res) => {
     try {
-      // Limit export to prevent memory overflow - users can paginate if needed
-      const { analyses } = await storage.getAllCostAnalyses(1, 100); // Reduced limit to prevent memory issues
-      
-      const exportData = analyses.map((analysis: any) => ({
-        'Report ID': analysis.reportId,
-        'Tank Type': analysis.tankType || 'N/A',
-        'Tank Name': analysis.tankName || 'N/A',
-        'Capacity (L)': analysis.capacity || 0,
-        'Height (mm)': analysis.height || 0,
-        'Material Cost': analysis.materialCost,
-        'Labor Cost': analysis.laborCost,
-        'Overhead Cost': analysis.overheadCost,
-        'Total Cost': analysis.totalCost,
-        'Analysis Date': analysis.analysisDate?.toISOString().split('T')[0],
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      // Initialize workbook and worksheet
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Cost Analysis');
+      let worksheet: any = null;
+      
+      const chunkSize = 50;
+      let page = 1;
+      let totalProcessed = 0;
+      let hasMore = true;
 
+      while (hasMore) {
+        const { analyses, total } = await storage.getAllCostAnalyses(page, chunkSize);
+        
+        if (analyses.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        const exportData = analyses.map((analysis: any) => ({
+          'Report ID': analysis.reportId,
+          'Tank Type': analysis.tankType || 'N/A',
+          'Tank Name': analysis.tankName || 'N/A',
+          'Capacity (L)': analysis.capacity || 0,
+          'Height (mm)': analysis.height || 0,
+          'Material Cost': analysis.materialCost,
+          'Labor Cost': analysis.laborCost,
+          'Overhead Cost': analysis.overheadCost,
+          'Total Cost': analysis.totalCost,
+          'Analysis Date': analysis.analysisDate?.toISOString().split('T')[0],
+        }));
+
+        // Create worksheet from first chunk, append to existing worksheet for subsequent chunks
+        if (worksheet === null) {
+          worksheet = XLSX.utils.json_to_sheet(exportData);
+        } else {
+          XLSX.utils.sheet_add_json(worksheet, exportData, { skipHeader: true, origin: -1 });
+        }
+        
+        totalProcessed += analyses.length;
+        
+        // Check if we've processed all records
+        if (page * chunkSize >= total || analyses.length < chunkSize) {
+          hasMore = false;
+        }
+        
+        page++;
+      }
+
+      // Handle case where no data was found
+      if (worksheet === null) {
+        worksheet = XLSX.utils.json_to_sheet([]);
+      }
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Cost Analysis');
       const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
       res.setHeader('Content-Disposition', 'attachment; filename=cost-analysis-export.xlsx');
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.send(buffer);
+      
+      console.log(`Export completed: ${totalProcessed} records exported`);
     } catch (error) {
       console.error("Error exporting Excel file:", error);
       res.status(500).json({ message: "Failed to export Excel file" });

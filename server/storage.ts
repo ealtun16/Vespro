@@ -139,7 +139,23 @@ export class DatabaseStorage implements IStorage {
     }
 
     const analyses = await db
-      .select()
+      .select({
+        id: v_cost_analysis_list.id,
+        reportId: v_cost_analysis_list.reportId,
+        materialCost: v_cost_analysis_list.materialCost,
+        laborCost: v_cost_analysis_list.laborCost,
+        overheadCost: v_cost_analysis_list.overheadCost,
+        totalCost: v_cost_analysis_list.totalCost,
+        currency: v_cost_analysis_list.currency,
+        analysisDate: v_cost_analysis_list.analysisDate,
+        tankName: v_cost_analysis_list.tankName,
+        tankType: v_cost_analysis_list.tankType,
+        capacity: v_cost_analysis_list.capacity,
+        height: v_cost_analysis_list.height,
+        tankSpecificationId: v_cost_analysis_list.tankSpecificationId,
+        createdAt: v_cost_analysis_list.createdAt,
+        updatedAt: v_cost_analysis_list.updatedAt
+      })
       .from(v_cost_analysis_list)
       .where(whereClause)
       .orderBy(desc(v_cost_analysis_list.analysisDate))
@@ -163,7 +179,23 @@ export class DatabaseStorage implements IStorage {
     // Try to get from vespro views first, fallback to legacy if not found
     try {
       const [analysis] = await db
-        .select()
+        .select({
+          id: v_cost_analysis_list.id,
+          reportId: v_cost_analysis_list.reportId,
+          materialCost: v_cost_analysis_list.materialCost,
+          laborCost: v_cost_analysis_list.laborCost,
+          overheadCost: v_cost_analysis_list.overheadCost,
+          totalCost: v_cost_analysis_list.totalCost,
+          currency: v_cost_analysis_list.currency,
+          analysisDate: v_cost_analysis_list.analysisDate,
+          tankName: v_cost_analysis_list.tankName,
+          tankType: v_cost_analysis_list.tankType,
+          capacity: v_cost_analysis_list.capacity,
+          height: v_cost_analysis_list.height,
+          tankSpecificationId: v_cost_analysis_list.tankSpecificationId,
+          createdAt: v_cost_analysis_list.createdAt,
+          updatedAt: v_cost_analysis_list.updatedAt
+        })
         .from(v_cost_analysis_list)
         .where(eq(v_cost_analysis_list.id, id));
 

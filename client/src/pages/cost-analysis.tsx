@@ -16,34 +16,30 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import CostAnalysisTable from "@/components/tables/cost-analysis-table";
 import { useTranslation } from "@/lib/i18n";
 
-// Simplified Vespro form schema
+// Turkish Vespro form schema
 const vesproFormSchema = z.object({
   // Form Information (Mandatory)
-  form_code: z.string().min(1, "Form code is required"),
-  client_name: z.string().min(1, "Client name is required"),
-  form_title: z.string().min(1, "Form title is required"),
-  form_date: z.string().min(1, "Form date is required"),
+  form_code: z.string().min(1, "Form kodu gerekli"),
+  client_name: z.string().min(1, "Müşteri adı gerekli"),
+  form_title: z.string().min(1, "Form başlığı gerekli"),
+  form_date: z.string().min(1, "Form tarihi gerekli"),
   revision_no: z.number().min(0).default(0),
   currency: z.string().default("EUR"),
   
-  // Tank Specifications (Mandatory)
-  tank_name: z.string().min(1, "Tank name is required"),
-  tank_type: z.string().min(1, "Tank type is required"),
-  tank_width_mm: z.string().optional(),
-  tank_height_mm: z.string().optional(),
-  tank_diameter_mm: z.string().optional(),
-  tank_volume: z.string().optional(),
-  tank_surface_area: z.string().optional(),
-  
-  // Material Information
-  tank_material_type: z.string().optional(),
-  tank_material_grade: z.string().optional(),
-  operating_pressure: z.string().optional(),
-  operating_temperature: z.string().optional(),
+  // Tank Specifications (Mandatory - Turkish fields)
+  tank_name: z.string().min(1, "Tank adı gerekli"),
+  tank_capi: z.number().min(1, "Tank çapı gerekli"), // TANK ÇAPI
+  silindirik_yukseklik: z.number().min(1, "Silindirik yükseklik gerekli"), // SİLİNDİRİK YÜKSEKLİK
+  insulation: z.enum(["var", "yok"], { required_error: "Insulation seçimi gerekli" }), // Insulation
+  karistirici: z.enum(["var", "yok"], { required_error: "Karıştırıcı seçimi gerekli" }), // Karistirici
+  ceket_serpantin: z.enum(["var", "yok"], { required_error: "Ceket/serpantin seçimi gerekli" }), // Ceket/serpantin
+  volume: z.number().min(0.1, "Volume gerekli"), // Volume
+  malzeme_kalitesi: z.string().min(1, "Malzeme kalitesi gerekli"), // Malzeme kalitesi
+  basinc: z.string().min(1, "Basınç gerekli"), // Basinc -> Sami
+  govde_acinimi: z.number().min(0, "Gövde açınımı gerekli"), // Govde Acinimi
+  sicaklik: z.number(), // Sicaklik
   
   // Additional Fields
-  drawing_revision: z.string().optional(),
-  project_status: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -64,7 +60,16 @@ export default function CostAnalysis() {
       revision_no: 0,
       currency: "EUR",
       tank_name: "",
-      tank_type: "",
+      tank_capi: 1000,
+      silindirik_yukseklik: 2000,
+      insulation: "yok",
+      karistirici: "yok", 
+      ceket_serpantin: "yok",
+      volume: 1.0,
+      malzeme_kalitesi: "",
+      basinc: "",
+      govde_acinimi: 0,
+      sicaklik: 20,
     },
   });
 
@@ -79,19 +84,20 @@ export default function CostAnalysis() {
         revision_no: data.revision_no,
         currency: data.currency,
         tank_name: data.tank_name,
-        tank_type: data.tank_type,
-        tank_width_mm: data.tank_width_mm,
-        tank_height_mm: data.tank_height_mm,
-        tank_diameter_mm: data.tank_diameter_mm,
-        tank_volume: data.tank_volume,
-        tank_surface_area: data.tank_surface_area,
-        tank_material_type: data.tank_material_type,
-        tank_material_grade: data.tank_material_grade,
-        operating_pressure: data.operating_pressure,
-        operating_temperature: data.operating_temperature,
-        drawing_revision: data.drawing_revision,
-        project_status: data.project_status,
+        tank_diameter_mm: data.tank_capi.toString(), // Tank çapı
+        tank_height_mm: data.silindirik_yukseklik.toString(), // Silindirik yükseklik
+        tank_volume: data.volume.toString(), // Volume
+        tank_material_grade: data.malzeme_kalitesi, // Malzeme kalitesi
+        operating_pressure: data.basinc, // Basınç
+        operating_temperature: data.sicaklik.toString(), // Sıcaklık
         notes: data.notes,
+        // Turkish specific fields in metadata
+        metadata: {
+          insulation: data.insulation,
+          karistirici: data.karistirici,
+          ceket_serpantin: data.ceket_serpantin,
+          govde_acinimi: data.govde_acinimi,
+        },
       };
 
       return await apiRequest("POST", "/api/vespro/forms", formPayload);
@@ -206,7 +212,7 @@ export default function CostAnalysis() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="revision_no"
@@ -247,38 +253,45 @@ export default function CostAnalysis() {
                           </FormItem>
                         )}
                       />
-                      <FormField
-                        control={form.control}
-                        name="project_status"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Project Status</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g., In Progress, Completed" {...field} data-testid="input-project-status" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Tank Specifications Section */}
+                {/* Tank Specifications Section - Turkish Fields */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Tank Specifications</CardTitle>
+                    <CardTitle>Tank Özellikleri</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="tank_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tank Adı *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Tank tanımlayıcısı" {...field} data-testid="input-tank-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name="tank_name"
+                        name="tank_capi"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Tank Name *</FormLabel>
+                            <FormLabel>Tank Çapı (mm) *</FormLabel>
                             <FormControl>
-                              <Input placeholder="Tank identifier" {...field} data-testid="input-tank-name" />
+                              <Input 
+                                type="number" 
+                                placeholder="Tank çapı"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                data-testid="input-tank-capi" 
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -286,23 +299,19 @@ export default function CostAnalysis() {
                       />
                       <FormField
                         control={form.control}
-                        name="tank_type"
+                        name="silindirik_yukseklik"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Tank Type *</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-tank-type">
-                                  <SelectValue placeholder="Select tank type" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="Storage Tank">Storage Tank</SelectItem>
-                                <SelectItem value="Pressure Vessel">Pressure Vessel</SelectItem>
-                                <SelectItem value="Heat Exchanger">Heat Exchanger</SelectItem>
-                                <SelectItem value="Reactor">Reactor</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <FormLabel>Silindirik Yükseklik (mm) *</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Silindirik yükseklik"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                data-testid="input-silindirik-yukseklik" 
+                              />
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -312,39 +321,63 @@ export default function CostAnalysis() {
                     <div className="grid grid-cols-3 gap-4">
                       <FormField
                         control={form.control}
-                        name="tank_width_mm"
+                        name="insulation"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Width (mm)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Width in mm" {...field} data-testid="input-tank-width" />
-                            </FormControl>
+                            <FormLabel>Insulation *</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-insulation">
+                                  <SelectValue placeholder="Seçiniz" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="var">Var</SelectItem>
+                                <SelectItem value="yok">Yok</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                       <FormField
                         control={form.control}
-                        name="tank_height_mm"
+                        name="karistirici"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Height (mm)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Height in mm" {...field} data-testid="input-tank-height" />
-                            </FormControl>
+                            <FormLabel>Karıştırıcı *</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-karistirici">
+                                  <SelectValue placeholder="Seçiniz" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="var">Var</SelectItem>
+                                <SelectItem value="yok">Yok</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                       <FormField
                         control={form.control}
-                        name="tank_diameter_mm"
+                        name="ceket_serpantin"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Diameter (mm)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Diameter in mm" {...field} data-testid="input-tank-diameter" />
-                            </FormControl>
+                            <FormLabel>Ceket/Serpantin *</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-ceket-serpantin">
+                                  <SelectValue placeholder="Seçiniz" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="var">Var</SelectItem>
+                                <SelectItem value="yok">Yok</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -354,12 +387,19 @@ export default function CostAnalysis() {
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name="tank_volume"
+                        name="volume"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Volume (m³)</FormLabel>
+                            <FormLabel>Volume (m³) *</FormLabel>
                             <FormControl>
-                              <Input placeholder="Volume in cubic meters" {...field} data-testid="input-tank-volume" />
+                              <Input 
+                                type="number" 
+                                step="0.1"
+                                placeholder="Volume"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                data-testid="input-volume" 
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -367,12 +407,12 @@ export default function CostAnalysis() {
                       />
                       <FormField
                         control={form.control}
-                        name="tank_surface_area"
+                        name="malzeme_kalitesi"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Surface Area (m²)</FormLabel>
+                            <FormLabel>Malzeme Kalitesi *</FormLabel>
                             <FormControl>
-                              <Input placeholder="Surface area in sq meters" {...field} data-testid="input-tank-surface-area" />
+                              <Input placeholder="Malzeme kalitesi" {...field} data-testid="input-malzeme-kalitesi" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -380,15 +420,15 @@ export default function CostAnalysis() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <FormField
                         control={form.control}
-                        name="tank_material_type"
+                        name="basinc"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Material Type</FormLabel>
+                            <FormLabel>Basınç *</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g., EVATHERM, Steel" {...field} data-testid="input-material-type" />
+                              <Input placeholder="Sami" {...field} data-testid="input-basinc" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -396,70 +436,52 @@ export default function CostAnalysis() {
                       />
                       <FormField
                         control={form.control}
-                        name="tank_material_grade"
+                        name="govde_acinimi"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Material Grade</FormLabel>
+                            <FormLabel>Gövde Açınımı *</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g., 1.4410, super duplex" {...field} data-testid="input-material-grade" />
+                              <Input 
+                                type="number" 
+                                placeholder="Gövde açınımı"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                data-testid="input-govde-acinimi" 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sicaklik"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sıcaklık (°C) *</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="Sıcaklık"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                data-testid="input-sicaklik" 
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="operating_pressure"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Operating Pressure</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g., 0 BAR, Normal Pressure" {...field} data-testid="input-operating-pressure" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="operating_temperature"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Operating Temperature</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g., SICAKLIK, Room Temperature" {...field} data-testid="input-operating-temperature" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <FormField
-                      control={form.control}
-                      name="drawing_revision"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Drawing Revision</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., Rev-01, 1788V01-EV1" {...field} data-testid="input-drawing-revision" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
                     <FormField
                       control={form.control}
                       name="notes"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Notes</FormLabel>
+                          <FormLabel>Notlar</FormLabel>
                           <FormControl>
-                            <Textarea placeholder="Additional notes or specifications" {...field} data-testid="textarea-notes" />
+                            <Textarea placeholder="Ek notlar veya özellikler" {...field} data-testid="textarea-notes" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,8 +99,16 @@ export default function Dashboard() {
 
   // Fetch Turkish cost analyses
   const { data: analyses, isLoading: analysesLoading, refetch: refetchAnalyses } = useQuery({
-    queryKey: ["/api/turkish-cost-analyses"],
-    queryFn: () => apiRequest("GET", "/api/turkish-cost-analyses"),
+    queryKey: ["turkish-cost-analyses"],
+    queryFn: async () => {
+      const response = await fetch("/api/turkish-cost-analyses");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    },
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   const form = useForm<TurkishCostAnalysisFormData>({

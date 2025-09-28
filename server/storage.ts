@@ -12,6 +12,9 @@ import {
   v_cost_analysis_list,
   v_cost_analysis_materials,
   v_dashboard_stats,
+  // New Turkish schema
+  turkishCostAnalyses,
+  turkishCostItems,
   type User, 
   type InsertUser,
   type TankSpecification,
@@ -28,7 +31,12 @@ import {
   type VesproForm,
   type InsertVesproForm,
   type VesproCostItem,
-  type InsertVesproCostItem
+  type InsertVesproCostItem,
+  // New Turkish types
+  type TurkishCostAnalysis,
+  type InsertTurkishCostAnalysis,
+  type TurkishCostItem,
+  type InsertTurkishCostItem
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, like, and, or, sql } from "drizzle-orm";
@@ -84,6 +92,22 @@ export interface IStorage {
   updateSettings(id: string, settings: Partial<InsertSettings>): Promise<Settings | undefined>;
   getGlobalSettings(): Promise<Settings | undefined>;
   getUserSettings(userId: string): Promise<Settings | undefined>;
+
+  // NEW TURKISH COST ANALYSIS METHODS
+  // Turkish Cost Analysis methods
+  getAllTurkishCostAnalyses(page?: number, limit?: number, search?: string): Promise<{ analyses: TurkishCostAnalysis[], total: number }>;
+  getTurkishCostAnalysis(id: string): Promise<TurkishCostAnalysis | undefined>;
+  getTurkishCostAnalysisWithItems(id: string): Promise<{ analysis: TurkishCostAnalysis, items: TurkishCostItem[] } | undefined>;
+  createTurkishCostAnalysis(analysis: InsertTurkishCostAnalysis): Promise<TurkishCostAnalysis>;
+  updateTurkishCostAnalysis(id: string, analysis: Partial<InsertTurkishCostAnalysis>): Promise<TurkishCostAnalysis | undefined>;
+  deleteTurkishCostAnalysis(id: string): Promise<boolean>;
+
+  // Turkish Cost Items methods
+  getTurkishCostItems(analysisId: string): Promise<TurkishCostItem[]>;
+  createTurkishCostItems(items: InsertTurkishCostItem[]): Promise<TurkishCostItem[]>;
+  updateTurkishCostItem(id: string, item: Partial<InsertTurkishCostItem>): Promise<TurkishCostItem | undefined>;
+  deleteTurkishCostItem(id: string): Promise<boolean>;
+  deleteTurkishCostItemsByAnalysisId(analysisId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -482,6 +506,114 @@ export class DatabaseStorage implements IStorage {
       .where(eq(settings.id, id))
       .returning();
     return updatedSettings || undefined;
+  }
+
+  // NEW TURKISH COST ANALYSIS IMPLEMENTATION
+  async getAllTurkishCostAnalyses(page = 1, limit = 10, search = ''): Promise<{ analyses: TurkishCostAnalysis[], total: number }> {
+    const offset = (page - 1) * limit;
+    
+    let whereConditions = [];
+    
+    if (search) {
+      whereConditions.push(
+        or(
+          like(turkishCostAnalyses.form_code, `%${search}%`),
+          like(turkishCostAnalyses.client_name, `%${search}%`),
+          like(turkishCostAnalyses.form_title, `%${search}%`),
+          like(turkishCostAnalyses.tank_name, `%${search}%`)
+        )
+      );
+    }
+
+    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+
+    const analysesQuery = db
+      .select()
+      .from(turkishCostAnalyses)
+      .orderBy(desc(turkishCostAnalyses.created_at))
+      .limit(limit)
+      .offset(offset);
+
+    const countQuery = db
+      .select({ count: sql<number>`count(*)` })
+      .from(turkishCostAnalyses);
+
+    // Only add where clause if we have conditions
+    const analyses = whereClause 
+      ? await analysesQuery.where(whereClause)
+      : await analysesQuery;
+
+    const [{ count }] = whereClause
+      ? await countQuery.where(whereClause)
+      : await countQuery;
+
+    return { analyses, total: count };
+  }
+
+  async getTurkishCostAnalysis(id: string): Promise<TurkishCostAnalysis | undefined> {
+    const [analysis] = await db.select().from(turkishCostAnalyses).where(eq(turkishCostAnalyses.id, id));
+    return analysis || undefined;
+  }
+
+  async getTurkishCostAnalysisWithItems(id: string): Promise<{ analysis: TurkishCostAnalysis, items: TurkishCostItem[] } | undefined> {
+    const analysis = await this.getTurkishCostAnalysis(id);
+    if (!analysis) return undefined;
+
+    const items = await this.getTurkishCostItems(id);
+
+    return { analysis, items };
+  }
+
+  async createTurkishCostAnalysis(analysis: InsertTurkishCostAnalysis): Promise<TurkishCostAnalysis> {
+    const [newAnalysis] = await db.insert(turkishCostAnalyses).values(analysis).returning();
+    return newAnalysis;
+  }
+
+  async updateTurkishCostAnalysis(id: string, analysis: Partial<InsertTurkishCostAnalysis>): Promise<TurkishCostAnalysis | undefined> {
+    const [updated] = await db
+      .update(turkishCostAnalyses)
+      .set({ ...analysis, updated_at: new Date() })
+      .where(eq(turkishCostAnalyses.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteTurkishCostAnalysis(id: string): Promise<boolean> {
+    const result = await db.delete(turkishCostAnalyses).where(eq(turkishCostAnalyses.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getTurkishCostItems(analysisId: string): Promise<TurkishCostItem[]> {
+    return await db
+      .select()
+      .from(turkishCostItems)
+      .where(eq(turkishCostItems.analysis_id, analysisId))
+      .orderBy(turkishCostItems.created_at);
+  }
+
+  async createTurkishCostItems(items: InsertTurkishCostItem[]): Promise<TurkishCostItem[]> {
+    if (items.length === 0) return [];
+    const newItems = await db.insert(turkishCostItems).values(items).returning();
+    return newItems;
+  }
+
+  async updateTurkishCostItem(id: string, item: Partial<InsertTurkishCostItem>): Promise<TurkishCostItem | undefined> {
+    const [updated] = await db
+      .update(turkishCostItems)
+      .set(item)
+      .where(eq(turkishCostItems.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteTurkishCostItem(id: string): Promise<boolean> {
+    const result = await db.delete(turkishCostItems).where(eq(turkishCostItems.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async deleteTurkishCostItemsByAnalysisId(analysisId: string): Promise<boolean> {
+    const result = await db.delete(turkishCostItems).where(eq(turkishCostItems.analysis_id, analysisId));
+    return (result.rowCount || 0) >= 0; // Returns true even if 0 items deleted
   }
 }
 

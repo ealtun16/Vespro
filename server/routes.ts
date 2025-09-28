@@ -1,7 +1,7 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterialSchema, insertSettingsSchema } from "@shared/schema";
+import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterialSchema, insertSettingsSchema, insertTurkishCostAnalysisSchema, insertTurkishCostItemSchema } from "@shared/schema";
 import * as XLSX from "xlsx";
 import { CostAnalysisEngine } from "./cost-analysis-engine";
 
@@ -412,6 +412,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching Vespro forms:', error);
       res.status(500).json({ error: 'Failed to fetch Vespro forms' });
+    }
+  });
+
+  // ========================================
+  // NEW TURKISH COST ANALYSIS ROUTES
+  // ========================================
+
+  // Get all Turkish cost analyses
+  app.get("/api/turkish-cost-analyses", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = (req.query.search as string) || '';
+      
+      const result = await storage.getAllTurkishCostAnalyses(page, limit, search);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching Turkish cost analyses:", error);
+      res.status(500).json({ message: "Failed to fetch Turkish cost analyses" });
+    }
+  });
+
+  // Get individual Turkish cost analysis with items
+  app.get("/api/turkish-cost-analyses/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await storage.getTurkishCostAnalysisWithItems(id);
+      
+      if (!result) {
+        return res.status(404).json({ message: "Turkish cost analysis not found" });
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching Turkish cost analysis detail:", error);
+      res.status(500).json({ message: "Failed to fetch Turkish cost analysis detail" });
+    }
+  });
+
+  // Create new Turkish cost analysis
+  app.post("/api/turkish-cost-analyses", async (req, res) => {
+    try {
+      const { cost_items, ...analysisData } = req.body;
+      
+      // Validate analysis data
+      const validatedAnalysisData = insertTurkishCostAnalysisSchema.parse(analysisData);
+      
+      // Create the analysis
+      const analysis = await storage.createTurkishCostAnalysis(validatedAnalysisData);
+      
+      // Create cost items if provided
+      let createdItems: any[] = [];
+      if (cost_items && Array.isArray(cost_items) && cost_items.length > 0) {
+        const validatedItems = cost_items.map(item => 
+          insertTurkishCostItemSchema.parse({
+            ...item,
+            analysis_id: analysis.id
+          })
+        );
+        
+        createdItems = await storage.createTurkishCostItems(validatedItems);
+      }
+
+      // Calculate total cost
+      const totalCost = createdItems.reduce((sum, item) => {
+        const itemTotal = Number(item.adet) * Number(item.birim_fiyat_euro);
+        return sum + itemTotal;
+      }, 0);
+
+      // Update analysis with total cost (using raw SQL update to bypass type checking)
+      const updatedAnalysis = await storage.updateTurkishCostAnalysis(analysis.id, {
+        total_cost: totalCost.toString()
+      } as any);
+
+      res.status(201).json({
+        analysis: updatedAnalysis || analysis,
+        items: createdItems
+      });
+    } catch (error) {
+      console.error("Error creating Turkish cost analysis:", error);
+      res.status(400).json({ message: "Invalid Turkish cost analysis data" });
+    }
+  });
+
+  // Update Turkish cost analysis
+  app.put("/api/turkish-cost-analyses/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { cost_items, ...analysisData } = req.body;
+      
+      // Validate and update analysis
+      const validatedData = insertTurkishCostAnalysisSchema.partial().parse(analysisData);
+      const analysis = await storage.updateTurkishCostAnalysis(id, validatedData);
+      
+      if (!analysis) {
+        return res.status(404).json({ message: "Turkish cost analysis not found" });
+      }
+
+      // Update cost items if provided
+      let updatedItems: any[] = [];
+      if (cost_items && Array.isArray(cost_items)) {
+        // Delete existing items and create new ones
+        await storage.deleteTurkishCostItemsByAnalysisId(id);
+        
+        if (cost_items.length > 0) {
+          const validatedItems = cost_items.map(item => 
+            insertTurkishCostItemSchema.parse({
+              ...item,
+              analysis_id: id
+            })
+          );
+          
+          updatedItems = await storage.createTurkishCostItems(validatedItems);
+        }
+
+        // Recalculate total cost
+        const totalCost = updatedItems.reduce((sum, item) => {
+          const itemTotal = Number(item.adet) * Number(item.birim_fiyat_euro);
+          return sum + itemTotal;
+        }, 0);
+
+        // Update analysis with new total cost (using raw SQL update to bypass type checking)
+        await storage.updateTurkishCostAnalysis(id, {
+          total_cost: totalCost.toString()
+        } as any);
+      }
+      
+      const result = await storage.getTurkishCostAnalysisWithItems(id);
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating Turkish cost analysis:", error);
+      res.status(400).json({ message: "Invalid Turkish cost analysis data" });
+    }
+  });
+
+  // Delete Turkish cost analysis
+  app.delete("/api/turkish-cost-analyses/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteTurkishCostAnalysis(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Turkish cost analysis not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting Turkish cost analysis:", error);
+      res.status(500).json({ message: "Failed to delete Turkish cost analysis" });
     }
   });
 

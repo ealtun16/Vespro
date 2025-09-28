@@ -27,97 +27,85 @@ import {
 } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  BarChart3,
-  TrendingUp,
-  Calculator,
-  Database,
   Plus,
   Trash2,
+  Eye,
 } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import CostAnalysisTable from "@/components/tables/cost-analysis-table";
-import { useTranslation } from "@/lib/i18n";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
-// Comprehensive cost analysis form schema with all fields
-const costAnalysisSchema = z.object({
-  // Form Information (Mandatory)
+// Turkish cost analysis form schema
+const turkishCostAnalysisSchema = z.object({
+  // Form Information
   form_code: z.string().min(1, "Form kodu gerekli"),
   client_name: z.string().min(1, "Müşteri adı gerekli"),
   form_title: z.string().min(1, "Form başlığı gerekli"),
   form_date: z.string().min(1, "Form tarihi gerekli"),
-  revision_no: z.number().min(0).default(0),
+  revision_no: z.coerce.number().min(0).default(0),
   currency: z.string().default("EUR"),
 
-  // Tank Specifications (Mandatory - Turkish fields)
+  // Turkish Tank Specifications
   tank_name: z.string().min(1, "Tank adı gerekli"),
-  tank_capi: z.number().min(1, "Tank çapı gerekli"), // TANK ÇAPI
-  silindirik_yukseklik: z.number().min(1, "Silindirik yükseklik gerekli"), // SİLİNDİRİK YÜKSEKLİK
-  insulation: z.enum(["var", "yok"], {
-    required_error: "Insulation seçimi gerekli",
-  }), // Insulation
-  karistirici: z.enum(["var", "yok"], {
-    required_error: "Karıştırıcı seçimi gerekli",
-  }), // Karistirici
-  ceket_serpantin: z.enum(["var", "yok"], {
-    required_error: "Ceket/serpantin seçimi gerekli",
-  }), // Ceket/serpantin
-  volume: z.number().min(0.1, "Volume gerekli"), // Volume
-  malzeme_kalitesi: z.string().min(1, "Malzeme kalitesi gerekli"), // Malzeme kalitesi
-  basinc: z.string().min(1, "Basınç gerekli"), // Basinc -> Sami
-  govde_acinimi: z.number().min(0, "Gövde açınımı gerekli"), // Govde Acinimi
-  sicaklik: z.number(), // Sicaklik
+  tank_capi: z.coerce.number().min(1, "Tank çapı gerekli"),
+  silindirik_yukseklik: z.coerce.number().min(1, "Silindirik yükseklik gerekli"),
+  insulation: z.enum(["var", "yok"]),
+  karistirici: z.enum(["var", "yok"]),
+  ceket_serpantin: z.enum(["var", "yok"]),
+  volume: z.coerce.number().min(0.1, "Volume gerekli"),
+  malzeme_kalitesi: z.string().min(1, "Malzeme kalitesi gerekli"),
+  basinc: z.string().min(1, "Basınç gerekli"),
+  govde_acinimi: z.coerce.number().min(0, "Gövde açınımı gerekli"),
+  sicaklik: z.coerce.number(),
 
-  // Cost Items (Mandatory)
+  // Cost Items
   cost_items: z
     .array(
       z.object({
-        maliyet_faktoru: z.string().min(1, "Maliyet faktörü gerekli"), // MALİYET FAKTÖRÜ
-        malzeme_kalitesi_item: z.union([z.string(), z.number()]).optional(), // MALZEME KALİTESİ
-        malzeme_tipi: z.string().optional(), // MALZEME TİPİ
-        adet: z.number().min(0, "Adet gerekli"), // Adet
-        toplam_miktar: z.number().min(0, "Toplam miktar gerekli"), // TOPLAM MİKTAR
-        birim: z.string().min(1, "Birim gerekli"), // BİRİM
-        birim_fiyat_euro: z.number().min(0, "Birim fiyat gerekli"), // BİRİM FİYAT EURO
+        maliyet_faktoru: z.string().min(1, "Maliyet faktörü gerekli"),
+        malzeme_kalitesi_item: z.string().optional(),
+        malzeme_tipi: z.string().optional(),
+        adet: z.coerce.number().min(0, "Adet gerekli"),
+        toplam_miktar: z.coerce.number().min(0, "Toplam miktar gerekli"),
+        birim: z.string().min(1, "Birim gerekli"),
+        birim_fiyat_euro: z.coerce.number().min(0, "Birim fiyat gerekli"),
       }),
     )
     .min(1, "En az bir maliyet faktörü eklenmeli"),
 
-  // Additional Fields
   notes: z.string().optional(),
 });
 
-type CostAnalysisFormData = z.infer<typeof costAnalysisSchema>;
-
-interface DashboardStats {
-  totalReports: number;
-  tankModels: number;
-  averageCost: number;
-  completionRate: number;
-}
+type TurkishCostAnalysisFormData = z.infer<typeof turkishCostAnalysisSchema>;
 
 export default function Dashboard() {
   const [open, setOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [selectedAnalysis, setSelectedAnalysis] = useState<any>(null);
   const { toast } = useToast();
-  const { t } = useTranslation();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ["/api/dashboard/stats"],
+  // Fetch Turkish cost analyses
+  const { data: analyses, isLoading: analysesLoading, refetch: refetchAnalyses } = useQuery({
+    queryKey: ["/api/turkish-cost-analyses"],
+    queryFn: () => apiRequest("GET", "/api/turkish-cost-analyses"),
   });
 
-  const { data: analyses, isLoading: analysesLoading } = useQuery({
-    queryKey: ["/api/cost-analyses", { limit: 5 }],
-  });
-
-  const form = useForm<CostAnalysisFormData>({
-    resolver: zodResolver(costAnalysisSchema),
+  const form = useForm<TurkishCostAnalysisFormData>({
+    resolver: zodResolver(turkishCostAnalysisSchema),
     defaultValues: {
-      form_code: `CA-${Date.now()}`,
+      form_code: `TCA-${Date.now()}`,
       client_name: "",
-      form_title: "MALİYET ANALİZ FORMU",
+      form_title: "TÜRKİYE MALİYET ANALİZ FORMU",
       form_date: new Date().toISOString().split("T")[0],
       revision_no: 0,
       currency: "EUR",
@@ -143,6 +131,7 @@ export default function Dashboard() {
           birim_fiyat_euro: 0,
         },
       ],
+      notes: "",
     },
   });
 
@@ -152,42 +141,17 @@ export default function Dashboard() {
   });
 
   const createAnalysisMutation = useMutation({
-    mutationFn: async (data: CostAnalysisFormData) => {
-      // Create the Vespro form with cost items
-      const formPayload = {
-        form_code: data.form_code,
-        client_name: data.client_name,
-        form_title: data.form_title,
-        form_date: data.form_date,
-        revision_no: data.revision_no,
-        currency: data.currency,
-        tank_name: data.tank_name,
-        tank_diameter_mm: data.tank_capi.toString(),
-        tank_height_mm: data.silindirik_yukseklik.toString(),
-        tank_volume: data.volume.toString(),
-        tank_material_grade: data.malzeme_kalitesi,
-        operating_pressure: data.basinc,
-        operating_temperature: data.sicaklik.toString(),
-        notes: data.notes,
-        metadata: {
-          insulation: data.insulation,
-          karistirici: data.karistirici,
-          ceket_serpantin: data.ceket_serpantin,
-          govde_acinimi: data.govde_acinimi,
-          cost_items: data.cost_items,
-        },
-      };
-
-      return await apiRequest("POST", "/api/vespro/forms", formPayload);
+    mutationFn: async (data: TurkishCostAnalysisFormData) => {
+      return await apiRequest("POST", "/api/turkish-cost-analyses", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cost-analyses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/turkish-cost-analyses"] });
       setOpen(false);
       form.reset();
+      refetchAnalyses();
       toast({
         title: "Başarılı",
-        description: "Maliyet analizi başarıyla oluşturuldu",
+        description: "Türkçe maliyet analizi başarıyla oluşturuldu",
       });
     },
     onError: () => {
@@ -199,7 +163,7 @@ export default function Dashboard() {
     },
   });
 
-  const onSubmit = (data: CostAnalysisFormData) => {
+  const onSubmit = (data: TurkishCostAnalysisFormData) => {
     createAnalysisMutation.mutate(data);
   };
 
@@ -215,425 +179,127 @@ export default function Dashboard() {
     });
   };
 
-  const calculateTotalPrice = (index: number) => {
-    const adet = form.watch(`cost_items.${index}.adet`);
-    const birimFiyat = form.watch(`cost_items.${index}.birim_fiyat_euro`);
-
-    if (adet && birimFiyat) {
-      const total = adet * birimFiyat;
-      form.setValue(`cost_items.${index}.toplam_miktar`, total);
+  const viewAnalysis = async (id: string) => {
+    try {
+      const analysis = await apiRequest("GET", `/api/turkish-cost-analyses/${id}`);
+      setSelectedAnalysis(analysis);
+      setViewOpen(true);
+    } catch (error) {
+      toast({
+        title: "Hata",
+        description: "Analiz detayları yüklenemedi",
+        variant: "destructive",
+      });
     }
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1
-            className="text-3xl font-bold text-foreground"
-            data-testid="text-page-title"
-          >
-            Maliyet Analizi Dashboard
+          <h1 className="text-3xl font-bold" data-testid="text-page-title">
+            Türkçe Maliyet Analizi Dashboard
           </h1>
-          <p
-            className="mt-2 text-sm text-muted-foreground"
-            data-testid="text-page-description"
-          >
-            Yeni maliyet analizi oluşturun ve mevcut analizleri yönetin
+          <p className="mt-2 text-sm text-muted-foreground" data-testid="text-page-description">
+            Yeni maliyet analizi oluşturun ve mevcut analizleri görüntüleyin
           </p>
         </div>
 
-        {/* Main Action Button */}
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="lg" data-testid="button-create-cost-analysis">
+            <Button size="lg" data-testid="button-create-analysis">
               <Plus className="mr-2 h-5 w-5" />
               Yeni Maliyet Analizi
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Maliyet Analizi Formu</DialogTitle>
+              <DialogTitle>Yeni Türkçe Maliyet Analizi Formu</DialogTitle>
             </DialogHeader>
             <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-6"
-              >
-                {/* Form Information Section */}
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                {/* Form Information */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Form Bilgileri</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="form_code"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Form Kodu *</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="CA-001"
-                                {...field}
-                                data-testid="input-form-code"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="client_name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Müşteri Adı *</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Müşteri veya şirket adı"
-                                {...field}
-                                data-testid="input-client-name"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="form_title"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Form Başlığı *</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                data-testid="input-form-title"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="form_date"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Form Tarihi *</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="date"
-                                {...field}
-                                data-testid="input-form-date"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="revision_no"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Revizyon Numarası</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                {...field}
-                                onChange={(e) =>
-                                  field.onChange(parseInt(e.target.value) || 0)
-                                }
-                                data-testid="input-revision-no"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="currency"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Para Birimi</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-currency">
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="EUR">EUR</SelectItem>
-                                <SelectItem value="USD">USD</SelectItem>
-                                <SelectItem value="TRY">TRY</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Cost Items Section */}
-                <Card>
-                  <CardHeader>
-                    <div className="flex justify-between items-center">
-                      <CardTitle>Maliyet Faktörleri *</CardTitle>
-                      <Button
-                        type="button"
-                        onClick={addCostItem}
-                        variant="outline"
-                        size="sm"
-                        data-testid="button-add-cost-item"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Ekle
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {fields.map((field, index) => (
-                      <Card key={field.id} className="p-4 border-2">
-                        <div className="flex justify-between items-center mb-4">
-                          <h4 className="font-medium">
-                            Maliyet Faktörü #{index + 1}
-                          </h4>
-                          {fields.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => remove(index)}
-                              data-testid={`button-remove-cost-item-${index}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <FormField
-                            control={form.control}
-                            name={`cost_items.${index}.maliyet_faktoru`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Maliyet Faktörü *</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    placeholder="SAÇ, KAYNAK, vs."
-                                    {...field}
-                                    data-testid={`input-maliyet-faktoru-${index}`}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name={`cost_items.${index}.malzeme_kalitesi_item`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Malzeme Kalitesi</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    placeholder="S235JR, 1.4410"
-                                    {...field}
-                                    data-testid={`input-malzeme-kalitesi-item-${index}`}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4 mb-4">
-                          <FormField
-                            control={form.control}
-                            name={`cost_items.${index}.malzeme_tipi`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Malzeme Tipi</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    placeholder="Çelik, Alüminyum"
-                                    {...field}
-                                    data-testid={`input-malzeme-tipi-${index}`}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name={`cost_items.${index}.adet`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Adet *</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    placeholder="Adet"
-                                    {...field}
-                                    onChange={(e) => {
-                                      field.onChange(
-                                        parseFloat(e.target.value) || 0,
-                                      );
-                                      calculateTotalPrice(index);
-                                    }}
-                                    data-testid={`input-adet-${index}`}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name={`cost_items.${index}.birim`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Birim *</FormLabel>
-                                <Select
-                                  onValueChange={field.onChange}
-                                  value={field.value}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger
-                                      data-testid={`select-birim-${index}`}
-                                    >
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="kg">kg</SelectItem>
-                                    <SelectItem value="adet">adet</SelectItem>
-                                    <SelectItem value="m">m</SelectItem>
-                                    <SelectItem value="m2">m²</SelectItem>
-                                    <SelectItem value="m3">m³</SelectItem>
-                                    <SelectItem value="set">set</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4">
-                          <FormField
-                            control={form.control}
-                            name={`cost_items.${index}.birim_fiyat_euro`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Birim Fiyat (€) *</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Birim fiyat"
-                                    {...field}
-                                    onChange={(e) => {
-                                      field.onChange(
-                                        parseFloat(e.target.value) || 0,
-                                      );
-                                      calculateTotalPrice(index);
-                                    }}
-                                    data-testid={`input-birim-fiyat-${index}`}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name={`cost_items.${index}.toplam_miktar`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Toplam Miktar *</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Toplam miktar"
-                                    {...field}
-                                    onChange={(e) =>
-                                      field.onChange(
-                                        parseFloat(e.target.value) || 0,
-                                      )
-                                    }
-                                    data-testid={`input-toplam-miktar-${index}`}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <div>
-                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                              Toplam Fiyat (€)
-                            </label>
-                            <Input
-                              value={(
-                                form.watch(`cost_items.${index}.adet`) *
-                                form.watch(
-                                  `cost_items.${index}.birim_fiyat_euro`,
-                                )
-                              ).toFixed(2)}
-                              readOnly
-                              className="bg-muted mt-2"
-                              data-testid={`text-total-price-${index}`}
-                            />
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </CardContent>
-                </Card>
-
-                {/* Tank Specifications Section */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Tank Özellikleri</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="tank_name"
+                      name="form_code"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Tank Adı *</FormLabel>
+                          <FormLabel>Form Kodu *</FormLabel>
                           <FormControl>
-                            <Input
-                              placeholder="Tank tanımlayıcısı"
-                              {...field}
-                              data-testid="input-tank-name"
-                            />
+                            <Input {...field} data-testid="input-form-code" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="client_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Müşteri Adı *</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-client-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="form_title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Form Başlığı *</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-form-title" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="form_date"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Form Tarihi *</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} data-testid="input-form-date" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
 
+                {/* Tank Specifications */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Tank Özellikleri</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="tank_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tank Adı *</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="input-tank-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <FormField
                         control={form.control}
                         name="tank_capi"
@@ -643,11 +309,8 @@ export default function Dashboard() {
                             <FormControl>
                               <Input
                                 type="number"
-                                placeholder="Tank çapı"
                                 {...field}
-                                onChange={(e) =>
-                                  field.onChange(parseInt(e.target.value) || 0)
-                                }
+                                onChange={(e) => field.onChange(Number(e.target.value))}
                                 data-testid="input-tank-capi"
                               />
                             </FormControl>
@@ -664,11 +327,8 @@ export default function Dashboard() {
                             <FormControl>
                               <Input
                                 type="number"
-                                placeholder="Silindirik yükseklik"
                                 {...field}
-                                onChange={(e) =>
-                                  field.onChange(parseInt(e.target.value) || 0)
-                                }
+                                onChange={(e) => field.onChange(Number(e.target.value))}
                                 data-testid="input-silindirik-yukseklik"
                               />
                             </FormControl>
@@ -676,22 +336,35 @@ export default function Dashboard() {
                           </FormItem>
                         )}
                       />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="volume"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Volume (m³) *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                {...field}
+                                onChange={(e) => field.onChange(Number(e.target.value))}
+                                data-testid="input-volume"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <FormField
                         control={form.control}
                         name="insulation"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Insulation *</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
+                            <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger data-testid="select-insulation">
-                                  <SelectValue placeholder="Seçiniz" />
+                                  <SelectValue />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -709,13 +382,10 @@ export default function Dashboard() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Karıştırıcı *</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
+                            <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger data-testid="select-karistirici">
-                                  <SelectValue placeholder="Seçiniz" />
+                                  <SelectValue />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -733,13 +403,10 @@ export default function Dashboard() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Ceket/Serpantin *</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                            >
+                            <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger data-testid="select-ceket-serpantin">
-                                  <SelectValue placeholder="Seçiniz" />
+                                  <SelectValue />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -751,33 +418,6 @@ export default function Dashboard() {
                           </FormItem>
                         )}
                       />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="volume"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Volume (m³) *</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.1"
-                                placeholder="Volume"
-                                {...field}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                data-testid="input-volume"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                       <FormField
                         control={form.control}
                         name="malzeme_kalitesi"
@@ -785,19 +425,12 @@ export default function Dashboard() {
                           <FormItem>
                             <FormLabel>Malzeme Kalitesi *</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="Malzeme kalitesi"
-                                {...field}
-                                data-testid="input-malzeme-kalitesi"
-                              />
+                              <Input {...field} data-testid="input-malzeme-kalitesi" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
                       <FormField
                         control={form.control}
                         name="basinc"
@@ -805,11 +438,7 @@ export default function Dashboard() {
                           <FormItem>
                             <FormLabel>Basınç *</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="Sami"
-                                {...field}
-                                data-testid="input-basinc"
-                              />
+                              <Input {...field} data-testid="input-basinc" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -824,13 +453,8 @@ export default function Dashboard() {
                             <FormControl>
                               <Input
                                 type="number"
-                                placeholder="Gövde açınımı"
                                 {...field}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
+                                onChange={(e) => field.onChange(Number(e.target.value))}
                                 data-testid="input-govde-acinimi"
                               />
                             </FormControl>
@@ -847,13 +471,8 @@ export default function Dashboard() {
                             <FormControl>
                               <Input
                                 type="number"
-                                placeholder="Sıcaklık"
                                 {...field}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
+                                onChange={(e) => field.onChange(Number(e.target.value))}
                                 data-testid="input-sicaklik"
                               />
                             </FormControl>
@@ -865,6 +484,149 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
 
+                {/* Cost Items */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
+                      <CardTitle>Maliyet Faktörleri *</CardTitle>
+                      <Button type="button" onClick={addCostItem} data-testid="button-add-cost-item">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Faktör Ekle
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {fields.map((field, index) => (
+                      <div key={field.id} className="border rounded p-4 space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-medium">Maliyet Faktörü #{index + 1}</h4>
+                          {fields.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => remove(index)}
+                              data-testid={`button-remove-cost-item-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                          <FormField
+                            control={form.control}
+                            name={`cost_items.${index}.maliyet_faktoru`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Maliyet Faktörü *</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid={`input-maliyet-faktoru-${index}`} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`cost_items.${index}.malzeme_tipi`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Malzeme Tipi</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid={`input-malzeme-tipi-${index}`} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`cost_items.${index}.birim`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Birim *</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid={`select-birim-${index}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="kg">kg</SelectItem>
+                                    <SelectItem value="adet">adet</SelectItem>
+                                    <SelectItem value="m">m</SelectItem>
+                                    <SelectItem value="m²">m²</SelectItem>
+                                    <SelectItem value="m³">m³</SelectItem>
+                                    <SelectItem value="set">set</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`cost_items.${index}.adet`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Adet *</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    {...field}
+                                    onChange={(e) => field.onChange(Number(e.target.value))}
+                                    data-testid={`input-adet-${index}`}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`cost_items.${index}.toplam_miktar`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Toplam Miktar *</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    {...field}
+                                    onChange={(e) => field.onChange(Number(e.target.value))}
+                                    data-testid={`input-toplam-miktar-${index}`}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`cost_items.${index}.birim_fiyat_euro`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Birim Fiyat (EUR) *</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    {...field}
+                                    onChange={(e) => field.onChange(Number(e.target.value))}
+                                    data-testid={`input-birim-fiyat-${index}`}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Notes */}
                 <FormField
                   control={form.control}
                   name="notes"
@@ -872,33 +634,19 @@ export default function Dashboard() {
                     <FormItem>
                       <FormLabel>Notlar</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Ek notlar veya özellikler"
-                          {...field}
-                          data-testid="textarea-notes"
-                        />
+                        <Textarea {...field} data-testid="input-notes" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <div className="flex justify-end space-x-2 pt-4 border-t">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setOpen(false)}
-                  >
+                <div className="flex justify-end gap-4">
+                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                     İptal
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={createAnalysisMutation.isPending}
-                    data-testid="button-submit-analysis"
-                  >
-                    {createAnalysisMutation.isPending
-                      ? "Oluşturuluyor..."
-                      : "Maliyet Analizi Oluştur"}
+                  <Button type="submit" disabled={createAnalysisMutation.isPending} data-testid="button-submit-form">
+                    {createAnalysisMutation.isPending ? "Oluşturuluyor..." : "Analiz Oluştur"}
                   </Button>
                 </div>
               </form>
@@ -907,105 +655,177 @@ export default function Dashboard() {
         </Dialog>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="card-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Toplam Analiz
-            </CardTitle>
-            <BarChart3 className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className="text-2xl font-bold text-foreground"
-              data-testid="text-total-reports"
-            >
-              {statsLoading ? "..." : stats?.totalReports || 0}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Bu ay +12%</p>
-          </CardContent>
-        </Card>
-
-        <Card className="card-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Tank Modelleri
-            </CardTitle>
-            <Database className="h-4 w-4 text-accent" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className="text-2xl font-bold text-foreground"
-              data-testid="text-tank-models"
-            >
-              {statsLoading ? "..." : stats?.tankModels || 0}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Aktif tank tasarımları
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="card-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Ortalama Maliyet
-            </CardTitle>
-            <Calculator className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className="text-2xl font-bold text-foreground"
-              data-testid="text-average-cost"
-            >
-              €
-              {statsLoading
-                ? "..."
-                : (stats?.averageCost || 0).toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Tank başına analiz
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="card-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Tamamlama Oranı
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div
-              className="text-2xl font-bold text-foreground"
-              data-testid="text-completion-rate"
-            >
-              {statsLoading ? "..." : Math.round(stats?.completionRate || 0)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Analiz tamamlama
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Analysis Table */}
-      <Card className="card-shadow">
+      {/* Existing Analyses Table */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-xl font-semibold text-foreground">
-            Son Maliyet Analizleri
-          </CardTitle>
+          <CardTitle>Mevcut Maliyet Analizleri</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <CostAnalysisTable
-            data={analyses}
-            loading={analysesLoading}
-            showPagination={false}
-          />
+        <CardContent>
+          {analysesLoading ? (
+            <div>Yükleniyor...</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Form Kodu</TableHead>
+                  <TableHead>Müşteri Adı</TableHead>
+                  <TableHead>Tank Adı</TableHead>
+                  <TableHead>Form Tarihi</TableHead>
+                  <TableHead>Toplam Maliyet</TableHead>
+                  <TableHead>İşlemler</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(analyses as any)?.analyses?.map((analysis: any) => (
+                  <TableRow key={analysis.id}>
+                    <TableCell data-testid={`text-form-code-${analysis.id}`}>{analysis.form_code}</TableCell>
+                    <TableCell data-testid={`text-client-name-${analysis.id}`}>{analysis.client_name}</TableCell>
+                    <TableCell data-testid={`text-tank-name-${analysis.id}`}>{analysis.tank_name}</TableCell>
+                    <TableCell data-testid={`text-form-date-${analysis.id}`}>{analysis.form_date}</TableCell>
+                    <TableCell data-testid={`text-total-cost-${analysis.id}`}>
+                      {analysis.total_cost ? `${analysis.total_cost} EUR` : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => viewAnalysis(analysis.id)}
+                        data-testid={`button-view-${analysis.id}`}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(!(analyses as any)?.analyses || (analyses as any).analyses.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      Henüz maliyet analizi bulunamadı
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
+
+      {/* View Analysis Dialog */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Maliyet Analizi Detayları</DialogTitle>
+          </DialogHeader>
+          {selectedAnalysis && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Form Bilgileri</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div>
+                    <strong>Form Kodu:</strong> {selectedAnalysis.analysis.form_code}
+                  </div>
+                  <div>
+                    <strong>Müşteri:</strong> {selectedAnalysis.analysis.client_name}
+                  </div>
+                  <div>
+                    <strong>Form Başlığı:</strong> {selectedAnalysis.analysis.form_title}
+                  </div>
+                  <div>
+                    <strong>Tarih:</strong> {selectedAnalysis.analysis.form_date}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tank Özellikleri</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div>
+                    <strong>Tank Adı:</strong> {selectedAnalysis.analysis.tank_name}
+                  </div>
+                  <div>
+                    <strong>Tank Çapı:</strong> {selectedAnalysis.analysis.tank_capi} mm
+                  </div>
+                  <div>
+                    <strong>Silindirik Yükseklik:</strong> {selectedAnalysis.analysis.silindirik_yukseklik} mm
+                  </div>
+                  <div>
+                    <strong>Volume:</strong> {selectedAnalysis.analysis.volume} m³
+                  </div>
+                  <div>
+                    <strong>Insulation:</strong> {selectedAnalysis.analysis.insulation}
+                  </div>
+                  <div>
+                    <strong>Karıştırıcı:</strong> {selectedAnalysis.analysis.karistirici}
+                  </div>
+                  <div>
+                    <strong>Malzeme Kalitesi:</strong> {selectedAnalysis.analysis.malzeme_kalitesi}
+                  </div>
+                  <div>
+                    <strong>Basınç:</strong> {selectedAnalysis.analysis.basinc}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {selectedAnalysis.items && selectedAnalysis.items.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Maliyet Faktörleri</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Maliyet Faktörü</TableHead>
+                          <TableHead>Malzeme Tipi</TableHead>
+                          <TableHead>Adet</TableHead>
+                          <TableHead>Toplam Miktar</TableHead>
+                          <TableHead>Birim</TableHead>
+                          <TableHead>Birim Fiyat</TableHead>
+                          <TableHead>Toplam</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedAnalysis.items.map((item: any) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{item.maliyet_faktoru}</TableCell>
+                            <TableCell>{item.malzeme_tipi || "-"}</TableCell>
+                            <TableCell>{item.adet}</TableCell>
+                            <TableCell>{item.toplam_miktar}</TableCell>
+                            <TableCell>{item.birim}</TableCell>
+                            <TableCell>{item.birim_fiyat_euro} EUR</TableCell>
+                            <TableCell>
+                              {(Number(item.adet) * Number(item.birim_fiyat_euro)).toFixed(2)} EUR
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {selectedAnalysis.analysis.notes && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Notlar</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p>{selectedAnalysis.analysis.notes}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="flex justify-end">
+                <Button onClick={() => setViewOpen(false)}>Kapat</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

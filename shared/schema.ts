@@ -335,18 +335,44 @@ export const insertSettingsSchema = createInsertSchema(settings).omit({
   updatedAt: true 
 });
 
-// New Turkish schemas
-export const insertTurkishCostAnalysisSchema = createInsertSchema(turkishCostAnalyses).omit({ 
-  id: true, 
-  created_at: true, 
-  updated_at: true,
-  total_cost: true // Calculated field
+// New Turkish schemas with proper number handling
+export const insertTurkishCostAnalysisSchema = z.object({
+  // Form Information - keep as is
+  form_code: z.string(),
+  client_name: z.string(),
+  form_title: z.string(),
+  form_date: z.string(),
+  revision_no: z.number().optional(),
+  currency: z.string().optional(),
+  
+  // Turkish Tank Specifications - convert numbers to strings
+  tank_name: z.string(),
+  tank_capi: z.number().transform(val => val.toString()),
+  silindirik_yukseklik: z.number().transform(val => val.toString()),
+  insulation: z.string(),
+  karistirici: z.string(),
+  ceket_serpantin: z.string(),
+  volume: z.number().transform(val => val.toString()),
+  malzeme_kalitesi: z.string(),
+  basinc: z.string(),
+  govde_acinimi: z.number().transform(val => val.toString()),
+  sicaklik: z.number().transform(val => val.toString()),
+  
+  // Additional fields
+  notes: z.string().optional(),
 });
 
-export const insertTurkishCostItemSchema = createInsertSchema(turkishCostItems).omit({ 
-  id: true, 
-  created_at: true,
-  item_total_price: true // Calculated field
+export const insertTurkishCostItemSchema = z.object({
+  analysis_id: z.string(),
+  
+  // Turkish Cost Item Fields - convert numbers to strings for numeric fields
+  maliyet_faktoru: z.string(),
+  malzeme_kalitesi_item: z.string().optional(),
+  malzeme_tipi: z.string().optional(),
+  adet: z.number().transform(val => val.toString()),
+  toplam_miktar: z.number().transform(val => val.toString()),
+  birim: z.string(),
+  birim_fiyat_euro: z.number().transform(val => val.toString()),
 });
 
 // Types

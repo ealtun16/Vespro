@@ -30,6 +30,9 @@ import {
   Plus,
   Trash2,
   Eye,
+  Database,
+  Calculator,
+  FileText,
 } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -193,6 +196,12 @@ export default function Dashboard() {
     }
   };
 
+  // Calculate summary statistics
+  const totalAnalyses = (analyses as any)?.total || 0;
+  const totalCost = (analyses as any)?.analyses?.reduce((sum: number, analysis: any) => {
+    return sum + (parseFloat(analysis.total_cost) || 0);
+  }, 0) || 0;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -310,7 +319,7 @@ export default function Dashboard() {
                               <Input
                                 type="number"
                                 {...field}
-                                onChange={(e) => field.onChange(Number(e.target.value))}
+                                onChange={(e) => field.onChange(e.target.value)}
                                 data-testid="input-tank-capi"
                               />
                             </FormControl>
@@ -328,7 +337,7 @@ export default function Dashboard() {
                               <Input
                                 type="number"
                                 {...field}
-                                onChange={(e) => field.onChange(Number(e.target.value))}
+                                onChange={(e) => field.onChange(e.target.value)}
                                 data-testid="input-silindirik-yukseklik"
                               />
                             </FormControl>
@@ -347,7 +356,7 @@ export default function Dashboard() {
                                 type="number"
                                 step="0.1"
                                 {...field}
-                                onChange={(e) => field.onChange(Number(e.target.value))}
+                                onChange={(e) => field.onChange(e.target.value)}
                                 data-testid="input-volume"
                               />
                             </FormControl>
@@ -454,7 +463,7 @@ export default function Dashboard() {
                               <Input
                                 type="number"
                                 {...field}
-                                onChange={(e) => field.onChange(Number(e.target.value))}
+                                onChange={(e) => field.onChange(e.target.value)}
                                 data-testid="input-govde-acinimi"
                               />
                             </FormControl>
@@ -472,7 +481,7 @@ export default function Dashboard() {
                               <Input
                                 type="number"
                                 {...field}
-                                onChange={(e) => field.onChange(Number(e.target.value))}
+                                onChange={(e) => field.onChange(e.target.value)}
                                 data-testid="input-sicaklik"
                               />
                             </FormControl>
@@ -574,7 +583,7 @@ export default function Dashboard() {
                                   <Input
                                     type="number"
                                     {...field}
-                                    onChange={(e) => field.onChange(Number(e.target.value))}
+                                    onChange={(e) => field.onChange(e.target.value)}
                                     data-testid={`input-adet-${index}`}
                                   />
                                 </FormControl>
@@ -593,7 +602,7 @@ export default function Dashboard() {
                                     type="number"
                                     step="0.01"
                                     {...field}
-                                    onChange={(e) => field.onChange(Number(e.target.value))}
+                                    onChange={(e) => field.onChange(e.target.value)}
                                     data-testid={`input-toplam-miktar-${index}`}
                                   />
                                 </FormControl>
@@ -612,7 +621,7 @@ export default function Dashboard() {
                                     type="number"
                                     step="0.01"
                                     {...field}
-                                    onChange={(e) => field.onChange(Number(e.target.value))}
+                                    onChange={(e) => field.onChange(e.target.value)}
                                     data-testid={`input-birim-fiyat-${index}`}
                                   />
                                 </FormControl>
@@ -655,14 +664,70 @@ export default function Dashboard() {
         </Dialog>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Toplam Analiz Sayısı
+            </CardTitle>
+            <Database className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-total-analyses">
+              {totalAnalyses}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Kayıtlı maliyet analizi
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Toplam Maliyet
+            </CardTitle>
+            <Calculator className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-total-cost">
+              €{totalCost.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Tüm analizler toplamı
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Sistem Durumu
+            </CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600" data-testid="text-system-status">
+              Aktif
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Türkçe maliyet analizi sistemi
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Existing Analyses Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Mevcut Maliyet Analizleri</CardTitle>
+          <CardTitle>Maliyet Analizleri</CardTitle>
         </CardHeader>
         <CardContent>
           {analysesLoading ? (
-            <div>Yükleniyor...</div>
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">Yükleniyor...</div>
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -683,7 +748,7 @@ export default function Dashboard() {
                     <TableCell data-testid={`text-tank-name-${analysis.id}`}>{analysis.tank_name}</TableCell>
                     <TableCell data-testid={`text-form-date-${analysis.id}`}>{analysis.form_date}</TableCell>
                     <TableCell data-testid={`text-total-cost-${analysis.id}`}>
-                      {analysis.total_cost ? `${analysis.total_cost} EUR` : "-"}
+                      {analysis.total_cost ? `€${parseFloat(analysis.total_cost).toFixed(2)}` : "-"}
                     </TableCell>
                     <TableCell>
                       <Button
@@ -699,8 +764,8 @@ export default function Dashboard() {
                 ))}
                 {(!(analyses as any)?.analyses || (analyses as any).analyses.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      Henüz maliyet analizi bulunamadı
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      Henüz maliyet analizi bulunamadı. Yeni bir analiz oluşturmak için yukarıdaki butona tıklayın.
                     </TableCell>
                   </TableRow>
                 )}
@@ -796,9 +861,9 @@ export default function Dashboard() {
                             <TableCell>{item.adet}</TableCell>
                             <TableCell>{item.toplam_miktar}</TableCell>
                             <TableCell>{item.birim}</TableCell>
-                            <TableCell>{item.birim_fiyat_euro} EUR</TableCell>
+                            <TableCell>€{parseFloat(item.birim_fiyat_euro).toFixed(2)}</TableCell>
                             <TableCell>
-                              {(Number(item.adet) * Number(item.birim_fiyat_euro)).toFixed(2)} EUR
+                              €{(Number(item.adet) * Number(item.birim_fiyat_euro)).toFixed(2)}
                             </TableCell>
                           </TableRow>
                         ))}

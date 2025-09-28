@@ -454,25 +454,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new Turkish cost analysis
   app.post("/api/turkish-cost-analyses", async (req, res) => {
     try {
+      console.log("Received Turkish cost analysis data:", JSON.stringify(req.body, null, 2));
+      
       const { cost_items, ...analysisData } = req.body;
       
       // Validate analysis data
+      console.log("Validating analysis data...");
       const validatedAnalysisData = insertTurkishCostAnalysisSchema.parse(analysisData);
+      console.log("Analysis data validated successfully");
       
       // Create the analysis
+      console.log("Creating Turkish cost analysis...");
       const analysis = await storage.createTurkishCostAnalysis(validatedAnalysisData);
+      console.log("Analysis created with ID:", analysis.id);
       
       // Create cost items if provided
       let createdItems: any[] = [];
       if (cost_items && Array.isArray(cost_items) && cost_items.length > 0) {
-        const validatedItems = cost_items.map(item => 
-          insertTurkishCostItemSchema.parse({
+        console.log("Creating cost items:", cost_items.length, "items");
+        const validatedItems = cost_items.map((item, index) => {
+          console.log(`Validating cost item ${index + 1}:`, item);
+          return insertTurkishCostItemSchema.parse({
             ...item,
             analysis_id: analysis.id
-          })
-        );
+          });
+        });
         
         createdItems = await storage.createTurkishCostItems(validatedItems);
+        console.log("Cost items created successfully:", createdItems.length);
       }
 
       // Calculate total cost
@@ -480,19 +489,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const itemTotal = Number(item.adet) * Number(item.birim_fiyat_euro);
         return sum + itemTotal;
       }, 0);
+      console.log("Total cost calculated:", totalCost);
 
-      // Update analysis with total cost (using raw SQL update to bypass type checking)
+      // Update analysis with total cost
       const updatedAnalysis = await storage.updateTurkishCostAnalysis(analysis.id, {
         total_cost: totalCost.toString()
       } as any);
+      console.log("Analysis updated with total cost");
 
       res.status(201).json({
         analysis: updatedAnalysis || analysis,
         items: createdItems
       });
-    } catch (error) {
-      console.error("Error creating Turkish cost analysis:", error);
-      res.status(400).json({ message: "Invalid Turkish cost analysis data" });
+    } catch (error: any) {
+      console.error("Detailed error creating Turkish cost analysis:");
+      console.error("Error message:", error?.message);
+      console.error("Error stack:", error?.stack);
+      console.error("Request body:", JSON.stringify(req.body, null, 2));
+      
+      if (error?.name === 'ZodError') {
+        console.error("Zod validation errors:", error.errors);
+        res.status(400).json({ 
+          message: "Form doğrulama hatası",
+          errors: error.errors,
+          details: error.errors.map((err: any) => `${err.path.join('.')}: ${err.message}`).join(', ')
+        });
+      } else if (error?.code === '23505') { // PostgreSQL unique constraint error
+        res.status(409).json({ 
+          message: "Bu form kodu zaten mevcut", 
+          details: "Lütfen farklı bir form kodu kullanın" 
+        });
+      } else if (error?.code && error.code.startsWith('23')) { // Other PostgreSQL constraint errors
+        res.status(400).json({ 
+          message: "Database kısıtlama hatası", 
+          details: error.message 
+        });
+      } else {
+        res.status(500).json({ 
+          message: "Türkçe maliyet analizi oluşturulamadı", 
+          details: error?.message || "Bilinmeyen hata oluştu"
+        });
+      }
     }
   });
 

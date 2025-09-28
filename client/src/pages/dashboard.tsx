@@ -145,6 +145,7 @@ export default function Dashboard() {
 
   const createAnalysisMutation = useMutation({
     mutationFn: async (data: TurkishCostAnalysisFormData) => {
+      console.log("Submitting Turkish cost analysis data:", data);
       return await apiRequest("POST", "/api/turkish-cost-analyses", data);
     },
     onSuccess: () => {
@@ -157,10 +158,30 @@ export default function Dashboard() {
         description: "Türkçe maliyet analizi başarıyla oluşturuldu",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Turkish cost analysis creation error:", error);
+      
+      let errorMessage = "Maliyet analizi oluşturulamadı";
+      let errorDetails = "";
+
+      if (error?.response?.data) {
+        const errorData = error.response.data;
+        errorMessage = errorData.message || errorMessage;
+        errorDetails = errorData.details || "";
+        
+        // If we have Zod validation errors, show them in a more user-friendly way
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorDetails = errorData.errors.map((err: any) => 
+            `${err.path.join(' → ')}: ${err.message}`
+          ).join('\n');
+        }
+      } else if (error?.message) {
+        errorDetails = error.message;
+      }
+
       toast({
         title: "Hata",
-        description: "Maliyet analizi oluşturulamadı",
+        description: errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage,
         variant: "destructive",
       });
     },

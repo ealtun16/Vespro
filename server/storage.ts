@@ -644,7 +644,7 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(sheetUpload)
       .set(upload)
-      .where(eq(sheetUpload.id, id))
+      .where(eq(sheetUpload.id, BigInt(id)))
       .returning();
     return updated || undefined;
   }
@@ -658,7 +658,7 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(tankOrder)
       .set(order)
-      .where(eq(tankOrder.id, id))
+      .where(eq(tankOrder.id, BigInt(id)))
       .returning();
     return updated || undefined;
   }
@@ -672,9 +672,26 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(costItem)
       .set(item)
-      .where(eq(costItem.id, id))
+      .where(eq(costItem.id, BigInt(id)))
       .returning();
     return updated || undefined;
+  }
+
+  async getAllTankOrders(): Promise<TankOrder[]> {
+    const orders = await db.select().from(tankOrder).orderBy(tankOrder.id);
+    return orders;
+  }
+
+  async getTankOrderWithItems(id: string): Promise<{ order: TankOrder; items: CostItem[] } | null> {
+    const [order] = await db.select().from(tankOrder).where(eq(tankOrder.id, BigInt(id)));
+    
+    if (!order) {
+      return null;
+    }
+    
+    const items = await db.select().from(costItem).where(eq(costItem.order_id, order.id));
+    
+    return { order, items };
   }
 }
 

@@ -115,6 +115,20 @@ export default function Dashboard() {
     refetchOnMount: true,
   });
 
+  // Fetch tank orders (from Excel upload)
+  const { data: tankOrdersData, isLoading: tankOrdersLoading, refetch: refetchTankOrders } = useQuery({
+    queryKey: ["tank-orders"],
+    queryFn: async () => {
+      const response = await fetch("/api/tank-orders");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+
   const form = useForm<TurkishCostAnalysisFormData>({
     resolver: zodResolver(turkishCostAnalysisSchema),
     defaultValues: {
@@ -332,8 +346,9 @@ export default function Dashboard() {
 
       const result = await response.json();
       
-      // Refresh the analyses list after successful upload
+      // Refresh the analyses list and tank orders after successful upload
       refetchAnalyses();
+      refetchTankOrders();
       
       toast({
         title: "Başarılı",
@@ -971,10 +986,10 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Existing Analyses Table */}
+      {/* Manual Analyses Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Maliyet Analizleri</CardTitle>
+          <CardTitle>Manuel Maliyet Analizleri</CardTitle>
         </CardHeader>
         <CardContent>
           {analysesLoading ? (
@@ -1029,6 +1044,61 @@ export default function Dashboard() {
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       Henüz maliyet analizi bulunamadı. Yeni bir analiz oluşturmak için yukarıdaki butona tıklayın.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Excel Uploaded Tank Orders Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Excel'den Yüklenen Formlar</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {tankOrdersLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">Yükleniyor...</div>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Sipariş Kodu</TableHead>
+                  <TableHead>Müşteri Adı</TableHead>
+                  <TableHead>Proje Kodu</TableHead>
+                  <TableHead>Malzeme</TableHead>
+                  <TableHead>Çap (mm)</TableHead>
+                  <TableHead>İşlemler</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(tankOrdersData as any)?.orders?.map((order: any) => (
+                  <TableRow key={order.id}>
+                    <TableCell data-testid={`text-order-code-${order.id}`}>{order.order_code}</TableCell>
+                    <TableCell data-testid={`text-customer-${order.id}`}>{order.customer_name || "-"}</TableCell>
+                    <TableCell data-testid={`text-project-${order.id}`}>{order.project_code || "-"}</TableCell>
+                    <TableCell data-testid={`text-material-${order.id}`}>{order.material_grade || "-"}</TableCell>
+                    <TableCell data-testid={`text-diameter-${order.id}`}>{order.diameter_mm || "-"}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/tank-order/${order.id}`, '_blank')}
+                        data-testid={`button-view-order-${order.id}`}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(!(tankOrdersData as any)?.orders || (tankOrdersData as any).orders.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      Henüz Excel'den yüklenmiş form bulunamadı. Excel dosyası yüklemek için yukarıdaki butona tıklayın.
                     </TableCell>
                   </TableRow>
                 )}

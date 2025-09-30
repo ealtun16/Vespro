@@ -616,6 +616,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // TANK ORDERS API (from Excel upload)
+  // ========================================
+  
+  // Get all tank orders
+  app.get("/api/tank-orders", async (req, res) => {
+    try {
+      const orders = await storage.getAllTankOrders();
+      // Convert BigInt IDs to strings for JSON serialization
+      const serializedOrders = orders.map(order => ({
+        ...order,
+        id: String(order.id),
+        source_sheet_id: order.source_sheet_id ? String(order.source_sheet_id) : null,
+      }));
+      res.json({ orders: serializedOrders });
+    } catch (error) {
+      console.error("Error fetching tank orders:", error);
+      res.status(500).json({ message: "Failed to fetch tank orders" });
+    }
+  });
+
+  // Get tank order with cost items
+  app.get("/api/tank-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const order = await storage.getTankOrderWithItems(id);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Tank order not found" });
+      }
+      
+      res.json(order);
+    } catch (error) {
+      console.error("Error fetching tank order:", error);
+      res.status(500).json({ message: "Failed to fetch tank order" });
+    }
+  });
+
+  // ========================================
   // EXCEL UPLOAD ROUTE 
   // ========================================
   

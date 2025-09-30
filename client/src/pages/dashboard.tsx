@@ -1098,7 +1098,6 @@ export default function Dashboard() {
                   <TableHead>Kod</TableHead>
                   <TableHead>Müşteri / Proje</TableHead>
                   <TableHead>Tank Özeti</TableHead>
-                  <TableHead className="text-right">Kalem</TableHead>
                   <TableHead className="text-right">Toplam Malzeme Kg</TableHead>
                   <TableHead className="text-right">İşçilik €</TableHead>
                   <TableHead className="text-right">Dış Ted. €</TableHead>
@@ -1144,9 +1143,6 @@ export default function Dashboard() {
                       </TableCell>
                       <TableCell data-testid={`text-tank-summary-${order.id}`}>
                         {tankSummary || '-'}
-                      </TableCell>
-                      <TableCell data-testid={`text-item-count-${order.id}`} className="text-right" title="Toplam kalem sayısı">
-                        {order.item_count || 0}
                       </TableCell>
                       <TableCell data-testid={`text-total-weight-${order.id}`} className="text-right">
                         {parseFloat(order.total_weight_kg || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg

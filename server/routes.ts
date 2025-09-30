@@ -48,6 +48,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     dotfiles: 'deny'
   }));
 
+  // Download route for specific files
+  app.get("/download/:filename", (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(uploadsDir, filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ 
+        message: "Dosya bulunamadı. Lütfen dosya adını kontrol edin." 
+      });
+    }
+    
+    // Send the file
+    res.download(filePath, filename, (err) => {
+      if (err) {
+        console.error('Download error:', err);
+        res.status(500).json({ 
+          message: "Dosya indirilemedi. Lütfen tekrar deneyin." 
+        });
+      }
+    });
+  });
+
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {

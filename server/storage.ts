@@ -733,7 +733,7 @@ export class DatabaseStorage implements IStorage {
   async getOrdersList(): Promise<any[]> {
     const result = await db.execute(sql`
       SELECT * FROM orders_list_view 
-      ORDER BY total_eur DESC NULLS LAST, updated_at DESC
+      ORDER BY total_price_eur DESC NULLS LAST, updated_at DESC
     `);
     return result.rows as any[];
   }

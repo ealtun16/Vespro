@@ -618,6 +618,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========================================
   // EXCEL UPLOAD ROUTE 
   // ========================================
+  
+  // Helper function to safely parse numeric values from Excel
+  const parseNumeric = (value: any): string | null => {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    
+    // If it's already a number, convert to string
+    if (typeof value === 'number') {
+      return String(value);
+    }
+    
+    // If it's a string, try to extract numeric value
+    if (typeof value === 'string') {
+      // Remove common units and text
+      const cleaned = value.replace(/[^\d.,-]/g, '').trim();
+      if (cleaned === '') {
+        return null;
+      }
+      
+      // Check if it's a valid number
+      const num = parseFloat(cleaned);
+      if (!isNaN(num)) {
+        return String(num);
+      }
+    }
+    
+    return null;
+  };
+  
   app.post("/api/excel/upload", upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
@@ -650,10 +680,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customer_name: worksheet['F2']?.v || '',
         project_code: worksheet['H2']?.v || '',
         material_grade: worksheet['J2']?.v || '',
-        diameter_mm: worksheet['L2']?.v ? String(worksheet['L2'].v) : null,
-        length_mm: worksheet['N2']?.v ? String(worksheet['N2'].v) : null,
+        diameter_mm: parseNumeric(worksheet['L2']?.v),
+        length_mm: parseNumeric(worksheet['N2']?.v),
         pressure_text: worksheet['P2']?.v || '',
-        temperature_c: worksheet['R2']?.v ? String(worksheet['R2'].v) : null,
+        temperature_c: parseNumeric(worksheet['R2']?.v),
         revision_text: worksheet['D3']?.v || '',
         category_label: worksheet['F3']?.v || '',
       };
@@ -693,10 +723,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             line_no: worksheet[`C${row}`]?.v || null,
             factor_name: cellD.v || '',
             // Add other fields as needed
-            quantity: worksheet[`K${row}`]?.v ? String(worksheet[`K${row}`].v) : null,
-            total_qty: worksheet[`L${row}`]?.v ? String(worksheet[`L${row}`].v) : null,
-            unit_price_eur: worksheet[`N${row}`]?.v ? String(worksheet[`N${row}`].v) : null,
-            line_total_eur: worksheet[`O${row}`]?.v ? String(worksheet[`O${row}`].v) : null,
+            quantity: parseNumeric(worksheet[`K${row}`]?.v),
+            total_qty: parseNumeric(worksheet[`L${row}`]?.v),
+            unit_price_eur: parseNumeric(worksheet[`N${row}`]?.v),
+            line_total_eur: parseNumeric(worksheet[`O${row}`]?.v),
           };
 
           await storage.createCostItem(costItemData);

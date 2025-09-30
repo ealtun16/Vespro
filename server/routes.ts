@@ -720,6 +720,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No file uploaded" });
       }
 
+      const stats = {
+        rowsProcessed: 0,
+        rowsInserted: 0,
+        rowsSkipped: 0,
+        skippedReasons: [] as string[],
+        dictUpserts: { units: 0, qualities: 0, types: 0 }
+      };
+
       // Parse Excel file
       const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
@@ -740,7 +748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         last_data_row: null
       });
 
-      // Parse header data from C2:R3 and map to tank_order
+      // Parse header data from C2:R3 - Full mapping
       const headerData = {
         order_code: worksheet['D2']?.v || `ORDER-${Date.now()}`,
         customer_name: worksheet['F2']?.v || '',
@@ -752,6 +760,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         temperature_c: parseNumeric(worksheet['R2']?.v),
         revision_text: worksheet['D3']?.v || '',
         category_label: worksheet['F3']?.v || '',
+        quantity: parseNumeric(worksheet['H3']?.v),
+        pressure_bar: parseNumeric(worksheet['J3']?.v),
+        total_weight_kg: parseNumeric(worksheet['L3']?.v),
+        total_price_eur: parseNumeric(worksheet['N3']?.v),
+        revision_no: worksheet['P3']?.v || '',
       };
 
       // Create tank order
@@ -760,43 +773,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...headerData
       });
 
-      // Process cost items starting from row 8
+      // Process cost items starting from row 8 (columns B-T)
       let row = 8;
-      let itemCount = 0;
-      let lastDataRow = 8;
-      const maxRows = 1000; // Safety limit
+      let lastDataRow = 7;
+      const maxRows = 1000;
 
       while (row < maxRows) {
-        const cellD = worksheet[`D${row}`];
-        const cellE = worksheet[`E${row}`];
-        const cellF = worksheet[`F${row}`];
-        const cellK = worksheet[`K${row}`];
+        stats.rowsProcessed++;
+
+        // Read all columns B-T
+        const colB = worksheet[`B${row}`]?.v; // group_no
+        const colC = worksheet[`C${row}`]?.v; // line_no
+        const colD = worksheet[`D${row}`]?.v; // factor_name
+        const colE = worksheet[`E${row}`]?.v; // material_quality
+        const colF = worksheet[`F${row}`]?.v; // material_type
+        const colG = worksheet[`G${row}`]?.v; // dim_g_mm
+        const colH = worksheet[`H${row}`]?.v; // dim_h_mm
+        const colI = worksheet[`I${row}`]?.v; // dim_i_mm_kg
+        const colJ = worksheet[`J${row}`]?.v; // kg_per_m
+        const colK = worksheet[`K${row}`]?.v; // quantity
+        const colL = worksheet[`L${row}`]?.v; // total_qty
+        const colM = worksheet[`M${row}`]?.v; // unit
+        const colN = worksheet[`N${row}`]?.v; // unit_price_eur
+        const colO = worksheet[`O${row}`]?.v; // line_total_eur
+        const colP = worksheet[`P${row}`]?.v; // material_status
+        const colQ = worksheet[`Q${row}`]?.v; // is_atolye_iscilik
+        const colR = worksheet[`R${row}`]?.v; // is_dis_tedarik
+        const colS = worksheet[`S${row}`]?.v; // is_atolye_iscilik_2
+        const colT = worksheet[`T${row}`]?.v; // note
         
-        // Check if D and adjacent columns are empty
-        if (!cellD?.v && !cellE?.v && !cellF?.v && !cellK?.v) {
+        // If completely empty row, try next
+        const hasAnyData = [colB, colC, colD, colE, colF, colG, colH, colI, colJ, colK, colL, colM, colN, colO, colP, colQ, colR, colS, colT].some(v => v !== undefined && v !== null && v !== '');
+        
+        if (!hasAnyData) {
           row++;
           continue;
         }
 
-        // If we have data, track last data row
-        if (cellD?.v) {
-          lastDataRow = row;
-          
-          // Process this cost item row
-          const costItemData = {
+        lastDataRow = row;
+
+        // Check if factor_name exists but all side columns are empty
+        if (colD) {
+          const hasSideData = 
+            colE || colF || 
+            (colG && parseNumeric(colG)) || 
+            (colH && parseNumeric(colH)) || 
+            (colI && parseNumeric(colI)) || 
+            (colJ && parseNumeric(colJ)) || 
+            (colK && parseNumeric(colK)) || 
+            (colL && parseNumeric(colL)) || 
+            colM || 
+            (colN && parseNumeric(colN)) || 
+            (colO && parseNumeric(colO)) || 
+            colP || 
+            colQ || colR || colS || colT;
+
+          if (!hasSideData) {
+            stats.rowsSkipped++;
+            stats.skippedReasons.push(`Row ${row}: factor_name="${colD}" but all side columns empty`);
+            row++;
+            continue;
+          }
+
+          // Upsert dictionary values
+          let unitId = null;
+          let qualityId = null;
+          let typeId = null;
+
+          if (colM && typeof colM === 'string' && colM.trim()) {
+            unitId = await storage.upsertUomUnit(colM.trim());
+            stats.dictUpserts.units++;
+          }
+
+          if (colE && typeof colE === 'string' && colE.trim()) {
+            qualityId = await storage.upsertMaterialQuality(colE.trim());
+            stats.dictUpserts.qualities++;
+          }
+
+          if (colF && typeof colF === 'string' && colF.trim()) {
+            typeId = await storage.upsertMaterialType(colF.trim());
+            stats.dictUpserts.types++;
+          }
+
+          // Build cost item data
+          const costItemData: any = {
             order_id: tankOrder.id,
-            group_no: parseInteger(worksheet[`B${row}`]?.v),
-            line_no: parseInteger(worksheet[`C${row}`]?.v),
-            factor_name: cellD.v || '',
-            // Add other fields as needed
-            quantity: parseNumeric(worksheet[`K${row}`]?.v),
-            total_qty: parseNumeric(worksheet[`L${row}`]?.v),
-            unit_price_eur: parseNumeric(worksheet[`N${row}`]?.v),
-            line_total_eur: parseNumeric(worksheet[`O${row}`]?.v),
+            group_no: parseInteger(colB),
+            line_no: parseInteger(colC),
+            factor_name: String(colD || ''),
+            material_quality_id: qualityId,
+            material_type_id: typeId,
+            dim_g_mm: parseNumeric(colG),
+            dim_h_mm: parseNumeric(colH),
+            dim_i_mm_kg: parseNumeric(colI),
+            kg_per_m: parseNumeric(colJ),
+            quantity: parseNumeric(colK),
+            total_qty: parseNumeric(colL),
+            unit_id: unitId,
+            unit_price_eur: parseNumeric(colN),
+            line_total_eur: parseNumeric(colO),
+            material_status: colP ? String(colP) : null,
+            is_atolye_iscilik: colQ ? Boolean(colQ) : null,
+            is_dis_tedarik: colR ? Boolean(colR) : null,
+            is_atolye_iscilik_2: colS ? Boolean(colS) : null,
+            note: colT ? String(colT) : null,
           };
 
           await storage.createCostItem(costItemData);
-          itemCount++;
+          stats.rowsInserted++;
         }
 
         row++;
@@ -810,9 +894,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         message: "Excel file processed successfully",
-        itemCount: itemCount,
         tankOrderId: String(tankOrder.id),
-        sheetUploadId: String(sheetUpload.id)
+        sheetUploadId: String(sheetUpload.id),
+        stats: {
+          ...stats,
+          lastDataRow
+        }
       });
 
     } catch (error) {

@@ -693,6 +693,37 @@ export class DatabaseStorage implements IStorage {
     
     return { order, items };
   }
+
+  // Dictionary table upsert methods
+  async upsertUomUnit(code: string, label?: string): Promise<number> {
+    const result = await db.execute(sql`
+      INSERT INTO uom_unit (code, label)
+      VALUES (${code}, ${label || code})
+      ON CONFLICT (code) DO UPDATE SET label = EXCLUDED.label
+      RETURNING id
+    `);
+    return (result.rows[0] as any).id;
+  }
+
+  async upsertMaterialQuality(name: string, note?: string): Promise<number> {
+    const result = await db.execute(sql`
+      INSERT INTO material_quality (name, note)
+      VALUES (${name}, ${note || null})
+      ON CONFLICT (name) DO UPDATE SET note = COALESCE(EXCLUDED.note, material_quality.note)
+      RETURNING id
+    `);
+    return (result.rows[0] as any).id;
+  }
+
+  async upsertMaterialType(name: string, note?: string): Promise<number> {
+    const result = await db.execute(sql`
+      INSERT INTO material_type (name, note)
+      VALUES (${name}, ${note || null})
+      ON CONFLICT (name) DO UPDATE SET note = COALESCE(EXCLUDED.note, material_type.note)
+      RETURNING id
+    `);
+    return (result.rows[0] as any).id;
+  }
 }
 
 export const storage = new DatabaseStorage();

@@ -1413,46 +1413,120 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Excel View Dialog */}
-      <Dialog open={excelViewOpen} onOpenChange={setExcelViewOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {excelViewData?.filename || 'Excel Dosyası'}
-            </DialogTitle>
-          </DialogHeader>
-          {excelLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">Yükleniyor...</div>
+      {/* Excel View Dialog - Full Screen */}
+      {excelViewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop with blur */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setExcelViewOpen(false)}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative z-10 bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-[95vw] h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold">
+                {excelViewData?.filename || 'Excel Dosyası'}
+              </h2>
+              <div className="flex items-center gap-2">
+                {excelViewData && excelViewData.fileData && (
+                  <Button
+                    onClick={() => {
+                      try {
+                        // Decode base64 to binary
+                        const binaryString = atob(excelViewData.fileData);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                          bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        
+                        // Create blob and download
+                        const blob = new Blob([bytes], { 
+                          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+                        });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = excelViewData.filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        
+                        toast({
+                          title: "Başarılı",
+                          description: "Excel dosyası indirildi",
+                        });
+                      } catch (error) {
+                        console.error('İndirme hatası:', error);
+                        toast({
+                          title: "Hata",
+                          description: "Excel dosyası indirilemedi",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    data-testid="button-download-excel"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    İndir
+                  </Button>
+                )}
+                <Button
+                  onClick={() => setExcelViewOpen(false)}
+                  variant="ghost"
+                  size="sm"
+                  data-testid="button-close-excel"
+                >
+                  Kapat
+                </Button>
+              </div>
             </div>
-          ) : excelViewData ? (
-            <div className="overflow-auto">
-              <div 
-                dangerouslySetInnerHTML={{ __html: excelViewData.html }}
-                className="excel-table"
-                style={{ 
-                  fontSize: '12px',
-                }}
-              />
-              <style>{`
-                .excel-table table {
-                  border-collapse: collapse;
-                  width: 100%;
-                  font-family: Arial, sans-serif;
-                }
-                .excel-table td, .excel-table th {
-                  border: 1px solid #ddd;
-                  padding: 4px 8px;
-                  text-align: left;
-                }
-                .excel-table tr:nth-child(even) {
-                  background-color: #f9f9f9;
-                }
-              `}</style>
+            
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-4">
+              {excelLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-muted-foreground">Yükleniyor...</div>
+                </div>
+              ) : excelViewData ? (
+                <div 
+                  dangerouslySetInnerHTML={{ __html: excelViewData.html }}
+                  className="excel-table"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-muted-foreground">Excel verisi bulunamadı</div>
+                </div>
+              )}
             </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+          </div>
+          
+          <style>{`
+            .excel-table table {
+              border-collapse: collapse;
+              width: 100%;
+              font-family: Arial, sans-serif;
+              font-size: 11px;
+            }
+            .excel-table td, .excel-table th {
+              border: 1px solid #ddd;
+              padding: 6px 10px;
+              text-align: left;
+              white-space: nowrap;
+            }
+            .excel-table tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .excel-table tr:hover {
+              background-color: #f0f0f0;
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 }

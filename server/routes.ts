@@ -680,6 +680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filename: sheetData.filename,
         sheetName: sheetData.sheet_name,
         html: html,
+        fileData: sheetData.file_data,
         uploadedAt: sheetData.uploaded_at
       });
     } catch (error) {

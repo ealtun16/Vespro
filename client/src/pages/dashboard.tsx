@@ -1413,12 +1413,12 @@ export default function Dashboard() {
                 {excelViewData?.filename || 'Excel Dosyası'}
               </h2>
               <div className="flex items-center gap-2">
-                {excelViewData?.filePath && (
+                {excelViewData?.filename && (
                   <Button
                     onClick={() => {
                       try {
                         const a = document.createElement('a');
-                        a.href = excelViewData.filePath;
+                        a.href = `/download/${excelViewData.filename}`;
                         a.download = excelViewData.filename;
                         document.body.appendChild(a);
                         a.click();

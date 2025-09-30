@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, pgSchema, pgEnum, pgView, text, varchar, decimal, integer, timestamp, jsonb, uuid, bigserial, boolean, numeric, date, customType, smallserial, smallint } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, pgEnum, pgView, text, varchar, decimal, integer, timestamp, jsonb, uuid, bigserial, bigint, boolean, numeric, date, customType, smallserial, smallint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -457,7 +457,7 @@ export const sheetUpload = pgTable("sheet_upload", {
 // Tank order main table
 export const tankOrder = pgTable("tank_order", {
   id: bigserial("id", { mode: "bigint" }).primaryKey(),
-  source_sheet_id: bigserial("source_sheet_id", { mode: "bigint" }).references(() => sheetUpload.id, { onDelete: "set null" }),
+  source_sheet_id: bigint("source_sheet_id", { mode: "bigint" }).references(() => sheetUpload.id, { onDelete: "set null" }),
   
   order_code: text("order_code").unique(),
   customer_name: text("customer_name"),
@@ -485,7 +485,7 @@ export const tankOrder = pgTable("tank_order", {
 // Tank order header raw data
 export const tankOrderHeaderRaw = pgTable("tank_order_header_raw", {
   id: bigserial("id", { mode: "bigint" }).primaryKey(),
-  order_id: bigserial("order_id", { mode: "bigint" }).notNull().references(() => tankOrder.id, { onDelete: "cascade" }),
+  order_id: bigint("order_id", { mode: "bigint" }).notNull().references(() => tankOrder.id, { onDelete: "cascade" }),
   excel_col_idx: integer("excel_col_idx").notNull(),
   excel_row_idx: integer("excel_row_idx").notNull(),
   cell_a1: text("cell_a1"),
@@ -495,7 +495,7 @@ export const tankOrderHeaderRaw = pgTable("tank_order_header_raw", {
 // Cost item table
 export const costItem = pgTable("cost_item", {
   id: bigserial("id", { mode: "bigint" }).primaryKey(),
-  order_id: bigserial("order_id", { mode: "bigint" }).notNull().references(() => tankOrder.id, { onDelete: "cascade" }),
+  order_id: bigint("order_id", { mode: "bigint" }).notNull().references(() => tankOrder.id, { onDelete: "cascade" }),
   
   group_no: integer("group_no"),
   line_no: integer("line_no"),

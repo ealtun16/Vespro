@@ -660,7 +660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create tank order
       const tankOrder = await storage.createTankOrder({
-        source_sheet_id: String(sheetUpload.id),
+        source_sheet_id: sheetUpload.id,
         ...headerData
       });
 
@@ -688,7 +688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Process this cost item row
           const costItemData = {
-            order_id: String(tankOrder.id),
+            order_id: tankOrder.id,
             group_no: worksheet[`B${row}`]?.v || null,
             line_no: worksheet[`C${row}`]?.v || null,
             factor_name: cellD.v || '',
@@ -707,7 +707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update sheet upload with last data row
-      await storage.updateSheetUpload(sheetUpload.id, {
+      await storage.updateSheetUpload(String(sheetUpload.id), {
         last_data_row: lastDataRow
       });
 

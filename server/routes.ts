@@ -647,6 +647,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     return null;
   };
+
+  // Helper function to safely parse integer values from Excel
+  const parseInteger = (value: any): number | null => {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    
+    // If it's already a number, round to integer
+    if (typeof value === 'number') {
+      return Math.round(value);
+    }
+    
+    // If it's a string, try to extract integer value
+    if (typeof value === 'string') {
+      // Remove all non-numeric characters
+      const cleaned = value.replace(/[^\d]/g, '').trim();
+      if (cleaned === '') {
+        return null;
+      }
+      
+      const num = parseInt(cleaned, 10);
+      if (!isNaN(num)) {
+        return num;
+      }
+    }
+    
+    return null;
+  };
   
   app.post("/api/excel/upload", upload.single('file'), async (req, res) => {
     try {
@@ -719,8 +747,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Process this cost item row
           const costItemData = {
             order_id: tankOrder.id,
-            group_no: worksheet[`B${row}`]?.v || null,
-            line_no: worksheet[`C${row}`]?.v || null,
+            group_no: parseInteger(worksheet[`B${row}`]?.v),
+            line_no: parseInteger(worksheet[`C${row}`]?.v),
             factor_name: cellD.v || '',
             // Add other fields as needed
             quantity: parseNumeric(worksheet[`K${row}`]?.v),

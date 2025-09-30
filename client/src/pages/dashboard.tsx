@@ -411,23 +411,36 @@ export default function Dashboard() {
   const handleViewExcel = async (orderId: string) => {
     setExcelLoading(true);
     setExcelViewOpen(true);
+    setExcelViewData(null);
     try {
       const response = await fetch(`/api/tank-orders/${orderId}/excel`);
       
       if (!response.ok) {
-        throw new Error('Excel dosyası yüklenemedi');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Excel dosyası yüklenemedi:', {
+          orderId,
+          status: response.status,
+          message: errorData.message
+        });
+        throw new Error(errorData.message || 'Excel dosyası yüklenemedi');
       }
       
       const data = await response.json();
+      
+      // Log the file path for debugging
+      console.log('Excel dosyası yüklendi:', {
+        filename: data.filename,
+        filePath: data.filePath,
+        orderId
+      });
+      
       setExcelViewData(data);
     } catch (error) {
       console.error('Excel görüntüleme hatası:', error);
-      toast({
-        title: "Hata",
-        description: "Excel dosyası görüntülenirken hata oluştu",
-        variant: "destructive",
+      setExcelViewData({ 
+        error: true, 
+        message: error instanceof Error ? error.message : 'Excel dosyası bulunamadı veya yol hatalı' 
       });
-      setExcelViewOpen(false);
     } finally {
       setExcelLoading(false);
     }
@@ -1460,6 +1473,20 @@ export default function Dashboard() {
               {excelLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-muted-foreground">Yükleniyor...</div>
+                </div>
+              ) : excelViewData?.error ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="text-destructive text-lg font-semibold mb-2">
+                      Dosya Bulunamadı
+                    </div>
+                    <div className="text-muted-foreground">
+                      {excelViewData.message || 'Excel dosyası bulunamadı veya yol hatalı'}
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-4">
+                      Lütfen dosyanın yüklendiğinden emin olun veya tekrar deneyin.
+                    </div>
+                  </div>
                 </div>
               ) : excelViewData?.html ? (
                 <div 

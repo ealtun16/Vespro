@@ -457,26 +457,10 @@ export default function Dashboard() {
       refetchTankOrders();
       refetchOrdersList();
       
-      // Build detailed report message
-      const stats = result.stats || {};
-      let reportMsg = `Excel dosyası başarıyla yüklendi!\n\n`;
-      reportMsg += `📊 İşlem Raporu:\n`;
-      reportMsg += `✓ Eklenen satırlar: ${stats.rowsInserted || 0}\n`;
-      if (stats.rowsSkipped > 0) {
-        reportMsg += `⊘ Atlanan satırlar: ${stats.rowsSkipped} (factor_name var ama yan sütunlar boş)\n`;
+      // Show the uploaded Excel content in a modal
+      if (result.tankOrderId) {
+        await handleViewExcel(result.tankOrderId);
       }
-      reportMsg += `📝 Son veri satırı: ${stats.lastDataRow || 'N/A'}\n`;
-      if (stats.dictUpserts) {
-        reportMsg += `\n📚 Sözlük Güncellemeleri:\n`;
-        reportMsg += `• Birimler: ${stats.dictUpserts.units || 0}\n`;
-        reportMsg += `• Kaliteler: ${stats.dictUpserts.qualities || 0}\n`;
-        reportMsg += `• Tipler: ${stats.dictUpserts.types || 0}`;
-      }
-      
-      toast({
-        title: "Başarılı",
-        description: reportMsg,
-      });
       
       // Reset file input
       event.target.value = '';

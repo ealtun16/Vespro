@@ -773,8 +773,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         message: "Excel file processed successfully",
         itemCount: itemCount,
-        tankOrderId: tankOrder.id,
-        sheetUploadId: sheetUpload.id
+        tankOrderId: String(tankOrder.id),
+        sheetUploadId: String(sheetUpload.id)
       });
 
     } catch (error) {

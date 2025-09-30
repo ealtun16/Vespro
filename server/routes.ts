@@ -16,19 +16,16 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Multer configuration for Excel upload - save to disk
+// Multer configuration for Excel upload - save to disk with original filename
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
       cb(null, uploadsDir);
     },
     filename: (req, file, cb) => {
-      // Keep original filename with timestamp to avoid conflicts
-      const timestamp = Date.now();
+      // Keep original filename and extension exactly as uploaded
       const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-      const ext = path.extname(originalName);
-      const basename = path.basename(originalName, ext);
-      cb(null, `${basename}_${timestamp}${ext}`);
+      cb(null, originalName);
     }
   }),
   limits: {
@@ -852,6 +849,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
+
+      // Log the exact file path
+      console.log('Excel file saved to:', req.file.path);
 
       const stats = {
         rowsProcessed: 0,

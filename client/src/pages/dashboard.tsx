@@ -33,6 +33,7 @@ import {
   Database,
   Calculator,
   FileText,
+  Upload,
 } from "lucide-react";
 import { Edit } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -312,6 +313,46 @@ export default function Dashboard() {
     }
   };
 
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/excel/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Excel yükleme başarısız');
+      }
+
+      const result = await response.json();
+      
+      // Refresh the analyses list after successful upload
+      refetchAnalyses();
+      
+      toast({
+        title: "Başarılı",
+        description: `Excel dosyası başarıyla yüklendi. ${result.itemCount || 0} kayıt eklendi.`,
+      });
+      
+      // Reset file input
+      event.target.value = '';
+    } catch (error) {
+      console.error('Excel upload error:', error);
+      toast({
+        title: "Hata",
+        description: "Excel dosyası yüklenirken hata oluştu",
+        variant: "destructive",
+      });
+      event.target.value = '';
+    }
+  };
+
   const addCostItem = () => {
     append({
       maliyet_faktoru: "",
@@ -358,45 +399,46 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <Dialog open={open} onOpenChange={(isOpen) => {
-          if (isOpen && !editMode) {
-            // Opening for create mode - reset form
-            setEditMode(false);
-            setEditingAnalysis(null);
-            form.reset({
-              form_code: `TCA-${Date.now()}`,
-              client_name: "",
-              form_title: "TÜRKİYE MALİYET ANALİZ FORMU",
-              form_date: new Date().toISOString().split("T")[0],
-              revision_no: 0,
-              currency: "EUR",
-              tank_name: "",
-              tank_capi: 0,
-              silindirik_yukseklik: 0,
-              insulation: "yok",
-              karistirici: "yok",
-              ceket_serpantin: "yok",
-              volume: 0,
-              malzeme_kalitesi: "",
-              basinc: "",
-              govde_acinimi: 0,
-              sicaklik: 20,
-              notes: "",
-              cost_items: [
-                {
-                  maliyet_faktoru: "",
-                  malzeme_kalitesi_item: "",
-                  malzeme_tipi: "",
-                  adet: 0,
-                  toplam_miktar: 0,
-                  birim: "",
-                  birim_fiyat_euro: 0,
-                }
-              ],
-            });
-          }
-          setOpen(isOpen);
-        }}>
+        <div className="flex gap-2">
+          <Dialog open={open} onOpenChange={(isOpen) => {
+            if (isOpen && !editMode) {
+              // Opening for create mode - reset form
+              setEditMode(false);
+              setEditingAnalysis(null);
+              form.reset({
+                form_code: `TCA-${Date.now()}`,
+                client_name: "",
+                form_title: "TÜRKİYE MALİYET ANALİZ FORMU",
+                form_date: new Date().toISOString().split("T")[0],
+                revision_no: 0,
+                currency: "EUR",
+                tank_name: "",
+                tank_capi: 0,
+                silindirik_yukseklik: 0,
+                insulation: "yok",
+                karistirici: "yok",
+                ceket_serpantin: "yok",
+                volume: 0,
+                malzeme_kalitesi: "",
+                basinc: "",
+                govde_acinimi: 0,
+                sicaklik: 20,
+                notes: "",
+                cost_items: [
+                  {
+                    maliyet_faktoru: "",
+                    malzeme_kalitesi_item: "",
+                    malzeme_tipi: "",
+                    adet: 0,
+                    toplam_miktar: 0,
+                    birim: "",
+                    birim_fiyat_euro: 0,
+                  }
+                ],
+              });
+            }
+            setOpen(isOpen);
+          }}>
           <DialogTrigger asChild>
             <Button size="lg" data-testid="button-create-analysis">
               <Plus className="mr-2 h-5 w-5" />
@@ -852,6 +894,27 @@ export default function Dashboard() {
             </Form>
           </DialogContent>
         </Dialog>
+      </div>
+      </div>
+
+      {/* Excel Upload Button */}
+      <div className="flex justify-end">
+        <Button 
+          size="lg" 
+          variant="outline"
+          onClick={() => document.getElementById('excel-upload')?.click()}
+          data-testid="button-upload-excel"
+        >
+          <Upload className="mr-2 h-5 w-5" />
+          Excel Dosyası Yükle
+        </Button>
+        <input
+          id="excel-upload"
+          type="file"
+          accept=".xlsx,.xls"
+          style={{ display: 'none' }}
+          onChange={handleExcelUpload}
+        />
       </div>
 
       {/* Summary Cards */}

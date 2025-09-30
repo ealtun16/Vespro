@@ -4,8 +4,24 @@ import { storage } from "./storage";
 import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterialSchema, insertSettingsSchema, insertTurkishCostAnalysisSchema, insertTurkishCostItemSchema } from "@shared/schema";
 import * as XLSX from "xlsx";
 import { CostAnalysisEngine } from "./cost-analysis-engine";
+import multer from "multer";
+import crypto from "crypto";
 
-// Multer upload configuration removed - replaced with manual data entry
+// Multer configuration for Excel upload
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.mimetype === 'application/vnd.ms-excel') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel files are allowed'));
+    }
+  }
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard stats
@@ -596,6 +612,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting Turkish cost analysis:", error);
       res.status(500).json({ message: "Failed to delete Turkish cost analysis" });
+    }
+  });
+
+  // ========================================
+  // EXCEL UPLOAD ROUTE 
+  // ========================================
+  app.post("/api/excel/upload", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Parse Excel file
+      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Get the file hash
+      const fileHash = crypto
+        .createHash('sha1')
+        .update(req.file.buffer)
+        .digest('hex');
+
+      // Create sheet upload record
+      const sheetUpload = await storage.createSheetUpload({
+        filename: req.file.originalname,
+        sheet_name: sheetName,
+        file_hash_sha1: fileHash,
+        first_data_row: 8,
+        last_data_row: null
+      });
+
+      // Parse header data from C2:R3 and map to tank_order
+      const headerData = {
+        order_code: worksheet['D2']?.v || `ORDER-${Date.now()}`,
+        customer_name: worksheet['F2']?.v || '',
+        project_code: worksheet['H2']?.v || '',
+        material_grade: worksheet['J2']?.v || '',
+        diameter_mm: worksheet['L2']?.v ? String(worksheet['L2'].v) : null,
+        length_mm: worksheet['N2']?.v ? String(worksheet['N2'].v) : null,
+        pressure_text: worksheet['P2']?.v || '',
+        temperature_c: worksheet['R2']?.v ? String(worksheet['R2'].v) : null,
+        revision_text: worksheet['D3']?.v || '',
+        category_label: worksheet['F3']?.v || '',
+      };
+
+      // Create tank order
+      const tankOrder = await storage.createTankOrder({
+        source_sheet_id: String(sheetUpload.id),
+        ...headerData
+      });
+
+      // Process cost items starting from row 8
+      let row = 8;
+      let itemCount = 0;
+      let lastDataRow = 8;
+      const maxRows = 1000; // Safety limit
+
+      while (row < maxRows) {
+        const cellD = worksheet[`D${row}`];
+        const cellE = worksheet[`E${row}`];
+        const cellF = worksheet[`F${row}`];
+        const cellK = worksheet[`K${row}`];
+        
+        // Check if D and adjacent columns are empty
+        if (!cellD?.v && !cellE?.v && !cellF?.v && !cellK?.v) {
+          row++;
+          continue;
+        }
+
+        // If we have data, track last data row
+        if (cellD?.v) {
+          lastDataRow = row;
+          
+          // Process this cost item row
+          const costItemData = {
+            order_id: String(tankOrder.id),
+            group_no: worksheet[`B${row}`]?.v || null,
+            line_no: worksheet[`C${row}`]?.v || null,
+            factor_name: cellD.v || '',
+            // Add other fields as needed
+            quantity: worksheet[`K${row}`]?.v ? String(worksheet[`K${row}`].v) : null,
+            total_qty: worksheet[`L${row}`]?.v ? String(worksheet[`L${row}`].v) : null,
+            unit_price_eur: worksheet[`N${row}`]?.v ? String(worksheet[`N${row}`].v) : null,
+            line_total_eur: worksheet[`O${row}`]?.v ? String(worksheet[`O${row}`].v) : null,
+          };
+
+          await storage.createCostItem(costItemData);
+          itemCount++;
+        }
+
+        row++;
+      }
+
+      // Update sheet upload with last data row
+      await storage.updateSheetUpload(sheetUpload.id, {
+        last_data_row: lastDataRow
+      });
+
+      res.json({
+        success: true,
+        message: "Excel file processed successfully",
+        itemCount: itemCount,
+        tankOrderId: tankOrder.id,
+        sheetUploadId: sheetUpload.id
+      });
+
+    } catch (error) {
+      console.error("Error processing Excel file:", error);
+      res.status(500).json({ 
+        message: "Failed to process Excel file",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

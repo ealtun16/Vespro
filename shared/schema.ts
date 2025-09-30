@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, pgSchema, pgEnum, pgView, text, varchar, decimal, integer, timestamp, jsonb, uuid, bigserial, boolean, numeric, date, customType } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, pgEnum, pgView, text, varchar, decimal, integer, timestamp, jsonb, uuid, bigserial, boolean, numeric, date, customType, smallserial, smallint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -419,3 +419,162 @@ export type VesproCostGroup = typeof vespro_cost_groups.$inferSelect;
 export type InsertVesproCostGroup = z.infer<typeof insertVesproCostGroupSchema>;
 export type VesproCostItem = typeof vespro_cost_items.$inferSelect;
 export type InsertVesproCostItem = z.infer<typeof insertVesproCostItemSchema>;
+
+// ================================
+// NEW TANK ORDER SCHEMA
+// ================================
+
+// Dictionary tables
+export const uomUnit = pgTable("uom_unit", {
+  id: smallserial("id").primaryKey(),
+  code: text("code").unique().notNull(),
+  label: text("label"),
+});
+
+export const materialQuality = pgTable("material_quality", {
+  id: smallserial("id").primaryKey(),
+  name: text("name").unique().notNull(),
+  note: text("note"),
+});
+
+export const materialTypeDict = pgTable("material_type", {
+  id: smallserial("id").primaryKey(),
+  name: text("name").unique().notNull(),
+  note: text("note"),
+});
+
+// Sheet upload tracking
+export const sheetUpload = pgTable("sheet_upload", {
+  id: bigserial("id", { mode: "bigint" }).primaryKey(),
+  filename: text("filename").notNull(),
+  sheet_name: text("sheet_name").notNull(),
+  uploaded_at: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  file_hash_sha1: text("file_hash_sha1"),
+  first_data_row: integer("first_data_row").default(8),
+  last_data_row: integer("last_data_row"),
+});
+
+// Tank order main table
+export const tankOrder = pgTable("tank_order", {
+  id: bigserial("id", { mode: "bigint" }).primaryKey(),
+  source_sheet_id: bigserial("source_sheet_id", { mode: "bigint" }).references(() => sheetUpload.id, { onDelete: "set null" }),
+  
+  order_code: text("order_code").unique(),
+  customer_name: text("customer_name"),
+  project_code: text("project_code"),
+  material_grade: text("material_grade"),
+  quantity: numeric("quantity"),
+  
+  diameter_mm: numeric("diameter_mm", { precision: 12, scale: 3 }),
+  length_mm: numeric("length_mm", { precision: 12, scale: 3 }),
+  pressure_text: text("pressure_text"),
+  pressure_bar: numeric("pressure_bar", { precision: 10, scale: 3 }),
+  
+  total_weight_kg: numeric("total_weight_kg", { precision: 14, scale: 3 }),
+  total_price_eur: numeric("total_price_eur", { precision: 14, scale: 2 }),
+  created_date: date("created_date"),
+  
+  revision_text: text("revision_text"),
+  revision_no: text("revision_no"),
+  category_label: text("category_label"),
+  temperature_c: numeric("temperature_c", { precision: 8, scale: 2 }),
+  
+  extra_head_json: jsonb("extra_head_json"),
+});
+
+// Tank order header raw data
+export const tankOrderHeaderRaw = pgTable("tank_order_header_raw", {
+  id: bigserial("id", { mode: "bigint" }).primaryKey(),
+  order_id: bigserial("order_id", { mode: "bigint" }).notNull().references(() => tankOrder.id, { onDelete: "cascade" }),
+  excel_col_idx: integer("excel_col_idx").notNull(),
+  excel_row_idx: integer("excel_row_idx").notNull(),
+  cell_a1: text("cell_a1"),
+  raw_value: text("raw_value"),
+});
+
+// Cost item table
+export const costItem = pgTable("cost_item", {
+  id: bigserial("id", { mode: "bigint" }).primaryKey(),
+  order_id: bigserial("order_id", { mode: "bigint" }).notNull().references(() => tankOrder.id, { onDelete: "cascade" }),
+  
+  group_no: integer("group_no"),
+  line_no: integer("line_no"),
+  factor_name: text("factor_name"),
+  
+  material_quality_id: smallint("material_quality_id").references(() => materialQuality.id, { onDelete: "set null" }),
+  material_type_id: smallint("material_type_id").references(() => materialTypeDict.id, { onDelete: "set null" }),
+  
+  dim_g_mm: numeric("dim_g_mm", { precision: 12, scale: 3 }),
+  dim_h_mm: numeric("dim_h_mm", { precision: 12, scale: 3 }),
+  dim_i_mm_kg: numeric("dim_i_mm_kg", { precision: 12, scale: 3 }),
+  kg_per_m: numeric("kg_per_m", { precision: 12, scale: 5 }),
+  
+  quantity: numeric("quantity", { precision: 14, scale: 3 }),
+  total_qty: numeric("total_qty", { precision: 14, scale: 3 }),
+  unit_id: smallint("unit_id").references(() => uomUnit.id),
+  
+  unit_price_eur: numeric("unit_price_eur", { precision: 14, scale: 4 }),
+  line_total_eur: numeric("line_total_eur", { precision: 14, scale: 2 }),
+  
+  material_status: text("material_status"),
+  is_atolye_iscilik: boolean("is_atolye_iscilik"),
+  is_dis_tedarik: boolean("is_dis_tedarik"),
+  is_atolye_iscilik_2: boolean("is_atolye_iscilik_2"),
+  
+  note: text("note"),
+});
+
+// Cost item raw data
+export const costItemRaw = pgTable("cost_item_raw", {
+  id: bigserial("id", { mode: "bigint" }).primaryKey(),
+  order_id: bigserial("order_id", { mode: "bigint" }).notNull().references(() => tankOrder.id, { onDelete: "cascade" }),
+  row_idx: integer("row_idx").notNull(),
+  col_b_to_t_json: jsonb("col_b_to_t_json"),
+});
+
+// Labor tables
+export const laborRole = pgTable("labor_role", {
+  id: smallserial("id").primaryKey(),
+  role_name: text("role_name").unique().notNull(),
+  description: text("description"),
+});
+
+export const laborRate = pgTable("labor_rate", {
+  id: bigserial("id", { mode: "bigint" }).primaryKey(),
+  role_id: smallint("role_id").notNull().references(() => laborRole.id, { onDelete: "cascade" }),
+  valid_from: date("valid_from").notNull(),
+  valid_to: date("valid_to"),
+  day_rate_eur: numeric("day_rate_eur", { precision: 12, scale: 2 }).notNull(),
+});
+
+export const laborLog = pgTable("labor_log", {
+  id: bigserial("id", { mode: "bigint" }).primaryKey(),
+  order_id: bigserial("order_id", { mode: "bigint" }).notNull().references(() => tankOrder.id, { onDelete: "cascade" }),
+  role_id: smallint("role_id").notNull().references(() => laborRole.id, { onDelete: "restrict" }),
+  work_type: text("work_type"),
+  work_date: date("work_date").notNull(),
+  man_days: numeric("man_days", { precision: 8, scale: 3 }).notNull(),
+  note: text("note"),
+});
+
+// Insert schemas for new tables
+export const insertTankOrderSchema = createInsertSchema(tankOrder).omit({
+  id: true,
+});
+
+export const insertCostItemSchema = createInsertSchema(costItem).omit({
+  id: true,
+});
+
+export const insertSheetUploadSchema = createInsertSchema(sheetUpload).omit({
+  id: true,
+  uploaded_at: true,
+});
+
+// Types for new tables
+export type TankOrder = typeof tankOrder.$inferSelect;
+export type InsertTankOrder = z.infer<typeof insertTankOrderSchema>;
+export type CostItem = typeof costItem.$inferSelect;
+export type InsertCostItem = z.infer<typeof insertCostItemSchema>;
+export type SheetUpload = typeof sheetUpload.$inferSelect;
+export type InsertSheetUpload = z.infer<typeof insertSheetUploadSchema>;

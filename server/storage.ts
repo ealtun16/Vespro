@@ -15,6 +15,16 @@ import {
   // New Turkish schema
   turkishCostAnalyses,
   turkishCostItems,
+  // New Tank Order schema
+  sheetUpload,
+  tankOrder,
+  costItem,
+  type SheetUpload,
+  type InsertSheetUpload,
+  type TankOrder,
+  type InsertTankOrder,
+  type CostItem,
+  type InsertCostItem,
   type User, 
   type InsertUser,
   type TankSpecification,
@@ -90,6 +100,14 @@ export interface IStorage {
   getSettings(userId?: string): Promise<Settings | undefined>;
   createSettings(settings: InsertSettings): Promise<Settings>;
   updateSettings(id: string, settings: Partial<InsertSettings>): Promise<Settings | undefined>;
+
+  // Tank Order methods  
+  createSheetUpload(upload: InsertSheetUpload): Promise<SheetUpload>;
+  updateSheetUpload(id: string, upload: Partial<InsertSheetUpload>): Promise<SheetUpload | undefined>;
+  createTankOrder(order: InsertTankOrder): Promise<TankOrder>;
+  updateTankOrder(id: string, order: Partial<InsertTankOrder>): Promise<TankOrder | undefined>;
+  createCostItem(item: InsertCostItem): Promise<CostItem>;
+  updateCostItem(id: string, item: Partial<InsertCostItem>): Promise<CostItem | undefined>;
   getGlobalSettings(): Promise<Settings | undefined>;
   getUserSettings(userId: string): Promise<Settings | undefined>;
 
@@ -614,6 +632,49 @@ export class DatabaseStorage implements IStorage {
   async deleteTurkishCostItemsByAnalysisId(analysisId: string): Promise<boolean> {
     const result = await db.delete(turkishCostItems).where(eq(turkishCostItems.analysis_id, analysisId));
     return (result.rowCount || 0) >= 0; // Returns true even if 0 items deleted
+  }
+
+  // Tank Order methods
+  async createSheetUpload(upload: InsertSheetUpload): Promise<SheetUpload> {
+    const [newUpload] = await db.insert(sheetUpload).values(upload).returning();
+    return newUpload;
+  }
+
+  async updateSheetUpload(id: string, upload: Partial<InsertSheetUpload>): Promise<SheetUpload | undefined> {
+    const [updated] = await db
+      .update(sheetUpload)
+      .set(upload)
+      .where(eq(sheetUpload.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async createTankOrder(order: InsertTankOrder): Promise<TankOrder> {
+    const [newOrder] = await db.insert(tankOrder).values(order).returning();
+    return newOrder;
+  }
+
+  async updateTankOrder(id: string, order: Partial<InsertTankOrder>): Promise<TankOrder | undefined> {
+    const [updated] = await db
+      .update(tankOrder)
+      .set(order)
+      .where(eq(tankOrder.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async createCostItem(item: InsertCostItem): Promise<CostItem> {
+    const [newItem] = await db.insert(costItem).values(item).returning();
+    return newItem;
+  }
+
+  async updateCostItem(id: string, item: Partial<InsertCostItem>): Promise<CostItem | undefined> {
+    const [updated] = await db
+      .update(costItem)
+      .set(item)
+      .where(eq(costItem.id, id))
+      .returning();
+    return updated || undefined;
   }
 }
 

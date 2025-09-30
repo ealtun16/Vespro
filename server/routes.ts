@@ -670,6 +670,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete Turkish cost analysis
+  app.delete("/api/turkish-cost-analyses/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteTurkishCostAnalysis(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Turkish cost analysis not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting Turkish cost analysis:", error);
+      res.status(500).json({ message: "Failed to delete Turkish cost analysis" });
+    }
+  });
+
   // ========================================
   // EXCEL UPLOAD ROUTE 
   // ========================================

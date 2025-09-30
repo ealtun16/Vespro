@@ -111,6 +111,8 @@ export default function Dashboard() {
   const [editingAnalysis, setEditingAnalysis] = useState<any>(null);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteAnalysisId, setDeleteAnalysisId] = useState<string | null>(null);
+  const [deleteAnalysisDialogOpen, setDeleteAnalysisDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Fetch Turkish cost analyses
@@ -286,6 +288,30 @@ export default function Dashboard() {
       toast({
         title: "Hata",
         description: "Form silinirken hata oluştu",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTurkishAnalysisMutation = useMutation({
+    mutationFn: async (analysisId: string) => {
+      return await apiRequest("DELETE", `/api/turkish-cost-analyses/${analysisId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["turkish-cost-analyses"] });
+      refetchAnalyses();
+      setDeleteAnalysisDialogOpen(false);
+      setDeleteAnalysisId(null);
+      toast({
+        title: "Başarılı",
+        description: "Maliyet analizi başarıyla silindi",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Turkish analysis delete error:", error);
+      toast({
+        title: "Hata",
+        description: "Maliyet analizi silinirken hata oluştu",
         variant: "destructive",
       });
     },
@@ -1088,6 +1114,17 @@ export default function Dashboard() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setDeleteAnalysisId(analysis.id);
+                            setDeleteAnalysisDialogOpen(true);
+                          }}
+                          data-testid={`button-delete-analysis-${analysis.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1308,6 +1345,32 @@ export default function Dashboard() {
                 }
               }}
               data-testid="button-confirm-delete"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Turkish Analysis Confirmation Dialog */}
+      <AlertDialog open={deleteAnalysisDialogOpen} onOpenChange={setDeleteAnalysisDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Maliyet Analizini Silmek İstediğinize Emin Misiniz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu işlem geri alınamaz. Maliyet analizi ve ilgili tüm maliyet kalemleri kalıcı olarak silinecektir.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-analysis">İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteAnalysisId) {
+                  deleteTurkishAnalysisMutation.mutate(deleteAnalysisId);
+                }
+              }}
+              data-testid="button-confirm-delete-analysis"
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Sil

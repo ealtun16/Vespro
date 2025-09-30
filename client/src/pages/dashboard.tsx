@@ -129,7 +129,21 @@ export default function Dashboard() {
     refetchOnMount: true,
   });
 
-  // Fetch tank orders (from Excel upload)
+  // Fetch orders list (combined view with costs)
+  const { data: ordersListData, isLoading: ordersListLoading, refetch: refetchOrdersList } = useQuery({
+    queryKey: ["orders-list"],
+    queryFn: async () => {
+      const response = await fetch("/api/orders/list");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+
+  // Fetch tank orders (from Excel upload) - kept for backward compatibility
   const { data: tankOrdersData, isLoading: tankOrdersLoading, refetch: refetchTankOrders } = useQuery({
     queryKey: ["tank-orders"],
     queryFn: async () => {
@@ -275,7 +289,9 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tank-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orders-list"] });
       refetchTankOrders();
+      refetchOrdersList();
       setDeleteDialogOpen(false);
       setDeleteOrderId(null);
       toast({
@@ -411,6 +427,7 @@ export default function Dashboard() {
       // Refresh the analyses list and tank orders after successful upload
       refetchAnalyses();
       refetchTankOrders();
+      refetchOrdersList();
       
       // Build detailed report message
       const stats = result.stats || {};
@@ -1064,13 +1081,13 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Combined Tank Cost Analysis Table */}
+      {/* Tank Cost Analysis Table */}
       <Card>
         <CardHeader>
           <CardTitle>Tank Maliyet Analizi</CardTitle>
         </CardHeader>
         <CardContent>
-          {(analysesLoading || tankOrdersLoading) ? (
+          {ordersListLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-muted-foreground">Yükleniyor...</div>
             </div>
@@ -1078,115 +1095,120 @@ export default function Dashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Form/Sipariş Kodu</TableHead>
-                  <TableHead>Müşteri Adı</TableHead>
-                  <TableHead>Detay</TableHead>
-                  <TableHead>Tarih</TableHead>
-                  <TableHead>Toplam Maliyet</TableHead>
+                  <TableHead>Kod</TableHead>
+                  <TableHead>Müşteri / Proje</TableHead>
+                  <TableHead>Tank Özeti</TableHead>
+                  <TableHead className="text-right">Kalem</TableHead>
+                  <TableHead className="text-right">Malzeme €</TableHead>
+                  <TableHead className="text-right">İşçilik €</TableHead>
+                  <TableHead className="text-right">Dış Ted. €</TableHead>
+                  <TableHead className="text-right">Toplam €</TableHead>
                   <TableHead>Kaynak</TableHead>
+                  <TableHead>Oluşturma / Güncelleme</TableHead>
                   <TableHead>İşlemler</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Manual Analyses */}
-                {(analyses as any)?.analyses?.map((analysis: any) => (
-                  <TableRow key={`manual-${analysis.id}`}>
-                    <TableCell data-testid={`text-code-manual-${analysis.id}`}>{analysis.form_code}</TableCell>
-                    <TableCell data-testid={`text-customer-manual-${analysis.id}`}>{analysis.client_name}</TableCell>
-                    <TableCell data-testid={`text-detail-manual-${analysis.id}`}>{analysis.tank_name}</TableCell>
-                    <TableCell data-testid={`text-date-manual-${analysis.id}`}>{analysis.form_date}</TableCell>
-                    <TableCell data-testid={`text-cost-manual-${analysis.id}`}>
-                      {analysis.total_cost ? `€${parseFloat(analysis.total_cost).toFixed(2)}` : "-"}
-                    </TableCell>
-                    <TableCell data-testid={`text-source-manual-${analysis.id}`}>
-                      <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                        Manuel
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => viewAnalysis(analysis.id)}
-                          data-testid={`button-view-manual-${analysis.id}`}
+                {(ordersListData as any)?.orders?.map((order: any) => {
+                  const tankSummary = [
+                    order.diameter_mm ? `Ø${parseFloat(order.diameter_mm).toFixed(0)}` : null,
+                    order.length_mm ? `${parseFloat(order.length_mm).toFixed(0)}mm` : null,
+                    order.pressure_bar ? `${parseFloat(order.pressure_bar).toFixed(1)} bar` : null,
+                    order.material_grade,
+                  ].filter(Boolean).join(' × ');
+
+                  const createdDate = order.created_date ? new Date(order.created_date).toLocaleDateString('tr-TR') : '-';
+                  const updatedAt = order.updated_at ? new Date(order.updated_at).toLocaleDateString('tr-TR') : '-';
+
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell data-testid={`text-kod-${order.id}`} className="font-medium">
+                        <a 
+                          href={`/tank-order/${order.id}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
                         >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditDialog(analysis)}
-                          data-testid={`button-edit-manual-${analysis.id}`}
+                          {order.kod || '-'}
+                        </a>
+                      </TableCell>
+                      <TableCell data-testid={`text-customer-${order.id}`}>
+                        <div className="flex flex-col">
+                          <span>{order.customer_name || '-'}</span>
+                          {order.project_code && (
+                            <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 mt-1 w-fit">
+                              {order.project_code}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell data-testid={`text-tank-summary-${order.id}`}>
+                        {tankSummary || '-'}
+                      </TableCell>
+                      <TableCell data-testid={`text-item-count-${order.id}`} className="text-right" title="Toplam kalem sayısı">
+                        {order.item_count || 0}
+                      </TableCell>
+                      <TableCell data-testid={`text-materials-${order.id}`} className="text-right">
+                        €{parseFloat(order.materials_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                      </TableCell>
+                      <TableCell data-testid={`text-labor-${order.id}`} className="text-right">
+                        €{parseFloat(order.labor_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                      </TableCell>
+                      <TableCell data-testid={`text-outsource-${order.id}`} className="text-right">
+                        €{parseFloat(order.outsource_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                      </TableCell>
+                      <TableCell data-testid={`text-total-${order.id}`} className="text-right font-bold">
+                        €{parseFloat(order.total_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                      </TableCell>
+                      <TableCell data-testid={`text-source-${order.id}`}>
+                        <span 
+                          className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
+                            order.source_kind === 'Excel' 
+                              ? 'bg-green-50 text-green-700 ring-green-700/10' 
+                              : 'bg-blue-50 text-blue-700 ring-blue-700/10'
+                          }`}
+                          title={order.source_filename || order.source_kind}
                         >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setDeleteAnalysisId(analysis.id);
-                            setDeleteAnalysisDialogOpen(true);
-                          }}
-                          data-testid={`button-delete-manual-${analysis.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                
-                {/* Excel Tank Orders */}
-                {(tankOrdersData as any)?.orders?.map((order: any) => (
-                  <TableRow key={`excel-${order.id}`}>
-                    <TableCell data-testid={`text-code-excel-${order.id}`}>{order.order_code}</TableCell>
-                    <TableCell data-testid={`text-customer-excel-${order.id}`}>{order.customer_name || "-"}</TableCell>
-                    <TableCell data-testid={`text-detail-excel-${order.id}`}>
-                      {order.project_code && order.material_grade 
-                        ? `${order.project_code} - ${order.material_grade}`
-                        : order.project_code || order.material_grade || "-"}
-                    </TableCell>
-                    <TableCell data-testid={`text-date-excel-${order.id}`}>{order.created_date || "-"}</TableCell>
-                    <TableCell data-testid={`text-cost-excel-${order.id}`}>
-                      {order.total_price_eur ? `€${parseFloat(order.total_price_eur).toFixed(2)}` : "-"}
-                    </TableCell>
-                    <TableCell data-testid={`text-source-excel-${order.id}`}>
-                      <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-700/10">
-                        Excel
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(`/tank-order/${order.id}`, '_blank')}
-                          data-testid={`button-view-excel-${order.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setDeleteOrderId(order.id);
-                            setDeleteDialogOpen(true);
-                          }}
-                          data-testid={`button-delete-excel-${order.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {order.source_kind}
+                        </span>
+                      </TableCell>
+                      <TableCell data-testid={`text-dates-${order.id}`}>
+                        <div className="flex flex-col text-sm">
+                          <span>{createdDate}</span>
+                          <span className="text-xs text-muted-foreground">{updatedAt}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`/tank-order/${order.id}`, '_blank')}
+                            data-testid={`button-view-${order.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setDeleteOrderId(order.id);
+                              setDeleteDialogOpen(true);
+                            }}
+                            data-testid={`button-delete-${order.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 
                 {/* Empty State */}
-                {(!(analyses as any)?.analyses || (analyses as any).analyses.length === 0) && 
-                 (!(tankOrdersData as any)?.orders || (tankOrdersData as any).orders.length === 0) && (
+                {(!(ordersListData as any)?.orders || (ordersListData as any).orders.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                       Henüz maliyet analizi bulunamadı. Manuel form oluşturmak veya Excel dosyası yüklemek için yukarıdaki butonları kullanın.
                     </TableCell>
                   </TableRow>

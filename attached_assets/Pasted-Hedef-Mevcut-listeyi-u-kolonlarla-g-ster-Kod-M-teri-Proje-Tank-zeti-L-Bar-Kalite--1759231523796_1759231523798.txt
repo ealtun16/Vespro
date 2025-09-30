@@ -1,0 +1,185 @@
+Hedef
+
+Mevcut listeyi şu kolonlarla göster:
+
+Kod
+
+Müşteri / Proje
+
+Tank Özeti (Ø×L | Bar | Kalite)
+
+Kalem (satır sayısı)
+
+Malzeme €
+
+İşçilik €
+
+Dış Ted. €
+
+Toplam €
+
+Kaynak (Excel/Manuel + tooltip: dosya adı)
+
+Oluşturma / Güncelleme
+
+Not: Durum kolonu kaldırılacak (varsa gizle).
+
+Backend (PostgreSQL) — Yalnız eksikse ekle/güncelle
+
+Bir liste endpoint’i (örn. GET /api/orders/list) hazırla ya da güncelle.
+Aşağıdaki SQL’i kullan; varsa eşdeğeri korunur, eksikler eklenir.
+
+-- orders_list_view: liste için tek sorguluk görünüm
+CREATE OR REPLACE VIEW orders_list_view AS
+WITH labor_cost AS (
+  SELECT
+    o.id AS order_id,
+    COALESCE((
+      SELECT SUM(ll.man_days * lr.day_rate_eur)
+      FROM labor_log ll
+      JOIN LATERAL (
+        SELECT lr2.day_rate_eur
+        FROM labor_rate lr2
+        WHERE lr2.role_id = ll.role_id
+          AND lr2.valid_from <= ll.work_date
+          AND (lr2.valid_to IS NULL OR lr2.valid_to >= ll.work_date)
+        ORDER BY lr2.valid_from DESC
+        LIMIT 1
+      ) lr ON TRUE
+      WHERE ll.order_id = o.id
+    ), 0)::numeric(14,2) AS labor_eur
+  FROM tank_order o
+)
+SELECT
+  o.id,
+  o.order_code AS kod,
+  o.customer_name,
+  o.project_code,
+  o.diameter_mm,
+  o.length_mm,
+  o.pressure_bar,
+  o.material_grade,
+  -- Kalem sayısı (sadece gerçek satırlar)
+  COUNT(ci.id) FILTER (WHERE ci.factor_name IS NOT NULL) AS item_count,
+  -- Malzeme alt toplam (işçilik ve dış tedarik işaretli olmayanlar)
+  COALESCE(SUM(ci.line_total_eur) FILTER (
+    WHERE COALESCE(ci.is_atolye_iscilik,false)=false
+      AND COALESCE(ci.is_dis_tedarik,false)=false
+  ),0)::numeric(14,2) AS materials_eur,
+  -- Dış tedarik alt toplam
+  COALESCE(SUM(ci.line_total_eur) FILTER (
+    WHERE COALESCE(ci.is_dis_tedarik,false)=true
+  ),0)::numeric(14,2) AS outsource_eur,
+  -- İşçilik alt toplam (labor_log'dan)
+  lc.labor_eur,
+  -- Genel toplam = satır toplamları + işçilik
+  (COALESCE(SUM(ci.line_total_eur),0) + COALESCE(lc.labor_eur,0))::numeric(14,2) AS total_eur,
+  -- Kaynak
+  CASE WHEN o.source_sheet_id IS NULL THEN 'Manuel' ELSE 'Excel' END AS source_kind,
+  su.filename AS source_filename,
+  o.created_date,
+  -- Güncelleme için "en son temas" zamanı
+  GREATEST(
+    COALESCE(o.created_date::timestamp, 'epoch'::timestamp),
+    COALESCE( (SELECT MAX(ll2.work_date)::timestamp FROM labor_log ll2 WHERE ll2.order_id=o.id), 'epoch'::timestamp ),
+    COALESCE(su.uploaded_at, 'epoch'::timestamptz)
+  ) AS updated_at
+FROM tank_order o
+LEFT JOIN cost_item ci ON ci.order_id = o.id
+LEFT JOIN sheet_upload su ON su.id = o.source_sheet_id
+LEFT JOIN labor_cost lc ON lc.order_id = o.id
+GROUP BY
+  o.id, o.order_code, o.customer_name, o.project_code,
+  o.diameter_mm, o.length_mm, o.pressure_bar, o.material_grade,
+  lc.labor_eur, su.filename, o.created_date, updated_at, source_kind;
+
+
+Değiştirme kuralı: Eğer mevcut API zaten bu değerleri sağlıyorsa dokunma. Eksik alan varsa orders_list_view’i oluştur ve endpoint bu view’dan dönsün.
+
+Sütun adları frontend’in beklediği JSON alanlarıyla aynı olmalı:
+
+kod, customer_name, project_code, diameter_mm, length_mm, pressure_bar, material_grade,
+
+item_count, materials_eur, labor_eur, outsource_eur, total_eur,
+
+source_kind, source_filename, created_date, updated_at.
+
+Frontend — Kolon tanımı ve görsel kurallar (yalnız gerekliyse uygula)
+
+Kolonlar (sıra ve kurallar):
+
+Kod → row.kod
+
+Link: detay sayfasına git (örn. /orders/{id})
+
+Metin kopyalanabilir (copy icon).
+
+Müşteri / Proje → row.customer_name + (varsa) row.project_code (küçük rozet)
+
+Tank Özeti (Ø×L | Bar | Kalite)
+
+Format: Ø{diameter_mm} × {length_mm} | {pressure_bar} bar | {material_grade}
+
+Her parça rozet; boş alanları gösterme.
+
+Kalem → row.item_count
+
+Tooltip: “Toplam kalem sayısı (malzeme+işçilik+dış tedarik)”.
+
+Malzeme € → row.materials_eur
+
+İşçilik € → row.labor_eur
+
+Dış Ted. € → row.outsource_eur
+
+Toplam € → row.total_eur (kalın)
+
+Para formatı: EUR, binlik ayırıcı, 2 ondalık; sağa hizalı.
+
+Sıralama varsayılanı: Toplam € ↓.
+
+Kaynak → row.source_kind (rozet: Excel/Manuel)
+
+Tooltip (hover): row.source_filename (varsa).
+
+Oluşturma / Güncelleme
+
+Üst satır: created_date (YYYY-MM-DD)
+
+Alt satır: updated_at (relative “x gün önce”).
+
+Sıralama ikincil: UpdatedAt ↓.
+
+Genel UI:
+
+Numara kolonları sağa hizalı.
+
+Mobilde iki satırlı kart düzeni:
+
+satır: Kod + Toplam €
+
+satır: Müşteri / Proje + Kaynak
+
+“Tank Özeti” tooltip veya alt satırda kısaltılmış gösterim.
+
+Tablo altına Σ Malzeme / İşçilik / Dış Ted. / Toplam özet satırı (isteğe bağlı).
+
+Durum kolonu varsa gizle/kaldır. Diğer kolon adları değişmeden kalıyorsa, sadece görünüm/sıra düzenle.
+
+Doğrulama (yalnızca raporla)
+
+SELECT * FROM orders_list_view LIMIT 3; dönebiliyor mu?
+
+JSON örneği üret ve tipleri kontrol et (para alanları sayısal).
+
+Eksik değerler: null alanları gizle, “—” gösterme.
+
+Tüm değişiklikleri özetle: “view eklendi/güncellendi”, “endpoint güncellendi/atlandı”, “kolonlar yeniden sıralandı/görünüm korundu”.
+
+Güvenlik ve idempotans
+
+Hiçbir şeyi zorla silme/değiştirme. Mevcut yapı aynıysa pas geç.
+
+Sadece eksik olanları oluştur ya da görünümü re-create et.
+
+Hata olursa ayrıntılı log ver, kısmi değişiklik yapma.

@@ -619,7 +619,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // TANK ORDERS API (from Excel upload)
   // ========================================
   
-  // Get all tank orders
+  // Get orders list (from view with computed costs)
+  app.get("/api/orders/list", async (req, res) => {
+    try {
+      const orders = await storage.getOrdersList();
+      // Convert BigInt IDs to strings for JSON serialization
+      const serializedOrders = orders.map((order: any) => ({
+        ...order,
+        id: String(order.id),
+      }));
+      res.json({ orders: serializedOrders });
+    } catch (error) {
+      console.error("Error fetching orders list:", error);
+      res.status(500).json({ message: "Failed to fetch orders list" });
+    }
+  });
+
+  // Get all tank orders (legacy - kept for backward compatibility)
   app.get("/api/tank-orders", async (req, res) => {
     try {
       const orders = await storage.getAllTankOrders();
@@ -667,23 +683,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting tank order:", error);
       res.status(500).json({ message: "Failed to delete tank order" });
-    }
-  });
-
-  // Delete Turkish cost analysis
-  app.delete("/api/turkish-cost-analyses/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const deleted = await storage.deleteTurkishCostAnalysis(id);
-      
-      if (!deleted) {
-        return res.status(404).json({ message: "Turkish cost analysis not found" });
-      }
-      
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting Turkish cost analysis:", error);
-      res.status(500).json({ message: "Failed to delete Turkish cost analysis" });
     }
   });
 

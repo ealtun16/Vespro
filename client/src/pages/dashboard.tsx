@@ -1064,13 +1064,13 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Manual Analyses Table */}
+      {/* Combined Tank Cost Analysis Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Manuel Maliyet Analizleri</CardTitle>
+          <CardTitle>Tank Maliyet Analizi</CardTitle>
         </CardHeader>
         <CardContent>
-          {analysesLoading ? (
+          {(analysesLoading || tankOrdersLoading) ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-muted-foreground">Yükleniyor...</div>
             </div>
@@ -1078,23 +1078,30 @@ export default function Dashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Form Kodu</TableHead>
+                  <TableHead>Form/Sipariş Kodu</TableHead>
                   <TableHead>Müşteri Adı</TableHead>
-                  <TableHead>Tank Adı</TableHead>
-                  <TableHead>Form Tarihi</TableHead>
+                  <TableHead>Detay</TableHead>
+                  <TableHead>Tarih</TableHead>
                   <TableHead>Toplam Maliyet</TableHead>
+                  <TableHead>Kaynak</TableHead>
                   <TableHead>İşlemler</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* Manual Analyses */}
                 {(analyses as any)?.analyses?.map((analysis: any) => (
-                  <TableRow key={analysis.id}>
-                    <TableCell data-testid={`text-form-code-${analysis.id}`}>{analysis.form_code}</TableCell>
-                    <TableCell data-testid={`text-client-name-${analysis.id}`}>{analysis.client_name}</TableCell>
-                    <TableCell data-testid={`text-tank-name-${analysis.id}`}>{analysis.tank_name}</TableCell>
-                    <TableCell data-testid={`text-form-date-${analysis.id}`}>{analysis.form_date}</TableCell>
-                    <TableCell data-testid={`text-total-cost-${analysis.id}`}>
+                  <TableRow key={`manual-${analysis.id}`}>
+                    <TableCell data-testid={`text-code-manual-${analysis.id}`}>{analysis.form_code}</TableCell>
+                    <TableCell data-testid={`text-customer-manual-${analysis.id}`}>{analysis.client_name}</TableCell>
+                    <TableCell data-testid={`text-detail-manual-${analysis.id}`}>{analysis.tank_name}</TableCell>
+                    <TableCell data-testid={`text-date-manual-${analysis.id}`}>{analysis.form_date}</TableCell>
+                    <TableCell data-testid={`text-cost-manual-${analysis.id}`}>
                       {analysis.total_cost ? `€${parseFloat(analysis.total_cost).toFixed(2)}` : "-"}
+                    </TableCell>
+                    <TableCell data-testid={`text-source-manual-${analysis.id}`}>
+                      <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                        Manuel
+                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -1102,7 +1109,7 @@ export default function Dashboard() {
                           variant="outline"
                           size="sm"
                           onClick={() => viewAnalysis(analysis.id)}
-                          data-testid={`button-view-${analysis.id}`}
+                          data-testid={`button-view-manual-${analysis.id}`}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -1110,7 +1117,7 @@ export default function Dashboard() {
                           variant="outline"
                           size="sm"
                           onClick={() => openEditDialog(analysis)}
-                          data-testid={`button-edit-${analysis.id}`}
+                          data-testid={`button-edit-manual-${analysis.id}`}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -1121,7 +1128,7 @@ export default function Dashboard() {
                             setDeleteAnalysisId(analysis.id);
                             setDeleteAnalysisDialogOpen(true);
                           }}
-                          data-testid={`button-delete-analysis-${analysis.id}`}
+                          data-testid={`button-delete-manual-${analysis.id}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1129,56 +1136,33 @@ export default function Dashboard() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {(!(analyses as any)?.analyses || (analyses as any).analyses.length === 0) && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      Henüz maliyet analizi bulunamadı. Yeni bir analiz oluşturmak için yukarıdaki butona tıklayın.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Excel Uploaded Tank Orders Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Excel'den Yüklenen Formlar</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {tankOrdersLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">Yükleniyor...</div>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Sipariş Kodu</TableHead>
-                  <TableHead>Müşteri Adı</TableHead>
-                  <TableHead>Proje Kodu</TableHead>
-                  <TableHead>Malzeme</TableHead>
-                  <TableHead>Çap (mm)</TableHead>
-                  <TableHead>İşlemler</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                
+                {/* Excel Tank Orders */}
                 {(tankOrdersData as any)?.orders?.map((order: any) => (
-                  <TableRow key={order.id}>
-                    <TableCell data-testid={`text-order-code-${order.id}`}>{order.order_code}</TableCell>
-                    <TableCell data-testid={`text-customer-${order.id}`}>{order.customer_name || "-"}</TableCell>
-                    <TableCell data-testid={`text-project-${order.id}`}>{order.project_code || "-"}</TableCell>
-                    <TableCell data-testid={`text-material-${order.id}`}>{order.material_grade || "-"}</TableCell>
-                    <TableCell data-testid={`text-diameter-${order.id}`}>{order.diameter_mm || "-"}</TableCell>
+                  <TableRow key={`excel-${order.id}`}>
+                    <TableCell data-testid={`text-code-excel-${order.id}`}>{order.order_code}</TableCell>
+                    <TableCell data-testid={`text-customer-excel-${order.id}`}>{order.customer_name || "-"}</TableCell>
+                    <TableCell data-testid={`text-detail-excel-${order.id}`}>
+                      {order.project_code && order.material_grade 
+                        ? `${order.project_code} - ${order.material_grade}`
+                        : order.project_code || order.material_grade || "-"}
+                    </TableCell>
+                    <TableCell data-testid={`text-date-excel-${order.id}`}>{order.created_date || "-"}</TableCell>
+                    <TableCell data-testid={`text-cost-excel-${order.id}`}>
+                      {order.total_price_eur ? `€${parseFloat(order.total_price_eur).toFixed(2)}` : "-"}
+                    </TableCell>
+                    <TableCell data-testid={`text-source-excel-${order.id}`}>
+                      <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-700/10">
+                        Excel
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => window.open(`/tank-order/${order.id}`, '_blank')}
-                          data-testid={`button-view-order-${order.id}`}
+                          data-testid={`button-view-excel-${order.id}`}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -1189,7 +1173,7 @@ export default function Dashboard() {
                             setDeleteOrderId(order.id);
                             setDeleteDialogOpen(true);
                           }}
-                          data-testid={`button-delete-order-${order.id}`}
+                          data-testid={`button-delete-excel-${order.id}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1197,10 +1181,13 @@ export default function Dashboard() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {(!(tankOrdersData as any)?.orders || (tankOrdersData as any).orders.length === 0) && (
+                
+                {/* Empty State */}
+                {(!(analyses as any)?.analyses || (analyses as any).analyses.length === 0) && 
+                 (!(tankOrdersData as any)?.orders || (tankOrdersData as any).orders.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      Henüz Excel'den yüklenmiş form bulunamadı. Excel dosyası yüklemek için yukarıdaki butona tıklayın.
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      Henüz maliyet analizi bulunamadı. Manuel form oluşturmak veya Excel dosyası yüklemek için yukarıdaki butonları kullanın.
                     </TableCell>
                   </TableRow>
                 )}

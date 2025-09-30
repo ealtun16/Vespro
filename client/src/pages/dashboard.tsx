@@ -113,6 +113,9 @@ export default function Dashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteAnalysisId, setDeleteAnalysisId] = useState<string | null>(null);
   const [deleteAnalysisDialogOpen, setDeleteAnalysisDialogOpen] = useState(false);
+  const [excelViewOpen, setExcelViewOpen] = useState(false);
+  const [excelViewData, setExcelViewData] = useState<any>(null);
+  const [excelLoading, setExcelLoading] = useState(false);
   const { toast } = useToast();
 
   // Fetch Turkish cost analyses
@@ -402,6 +405,29 @@ export default function Dashboard() {
         description: "Analiz verileri yüklenemedi",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleViewExcel = async (orderId: string) => {
+    setExcelLoading(true);
+    setExcelViewOpen(true);
+    try {
+      const response = await fetch(`/api/tank-orders/${orderId}/excel`);
+      if (!response.ok) {
+        throw new Error('Excel dosyası yüklenemedi');
+      }
+      const data = await response.json();
+      setExcelViewData(data);
+    } catch (error) {
+      console.error('Excel görüntüleme hatası:', error);
+      toast({
+        title: "Hata",
+        description: "Excel dosyası görüntülenirken hata oluştu",
+        variant: "destructive",
+      });
+      setExcelViewOpen(false);
+    } finally {
+      setExcelLoading(false);
     }
   };
 
@@ -1122,14 +1148,17 @@ export default function Dashboard() {
                   return (
                     <TableRow key={order.id}>
                       <TableCell data-testid={`text-kod-${order.id}`} className="font-medium">
-                        <a 
-                          href={`/tank-order/${order.id}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {order.kod || '-'}
-                        </a>
+                        {order.source_kind === 'Excel' ? (
+                          <button
+                            onClick={() => handleViewExcel(order.id)}
+                            className="text-blue-600 hover:underline cursor-pointer"
+                            data-testid={`button-view-excel-${order.id}`}
+                          >
+                            {order.kod || '-'}
+                          </button>
+                        ) : (
+                          <span>{order.kod || '-'}</span>
+                        )}
                       </TableCell>
                       <TableCell data-testid={`text-customer-${order.id}`}>
                         <div className="flex flex-col">
@@ -1383,6 +1412,47 @@ export default function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Excel View Dialog */}
+      <Dialog open={excelViewOpen} onOpenChange={setExcelViewOpen}>
+        <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {excelViewData?.filename || 'Excel Dosyası'}
+            </DialogTitle>
+          </DialogHeader>
+          {excelLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">Yükleniyor...</div>
+            </div>
+          ) : excelViewData ? (
+            <div className="overflow-auto">
+              <div 
+                dangerouslySetInnerHTML={{ __html: excelViewData.html }}
+                className="excel-table"
+                style={{ 
+                  fontSize: '12px',
+                }}
+              />
+              <style>{`
+                .excel-table table {
+                  border-collapse: collapse;
+                  width: 100%;
+                  font-family: Arial, sans-serif;
+                }
+                .excel-table td, .excel-table th {
+                  border: 1px solid #ddd;
+                  padding: 4px 8px;
+                  text-align: left;
+                }
+                .excel-table tr:nth-child(even) {
+                  background-color: #f9f9f9;
+                }
+              `}</style>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -452,6 +452,7 @@ export const sheetUpload = pgTable("sheet_upload", {
   file_hash_sha1: text("file_hash_sha1"),
   first_data_row: integer("first_data_row").default(8),
   last_data_row: integer("last_data_row"),
+  file_data: text("file_data"),
 });
 
 // Tank order main table

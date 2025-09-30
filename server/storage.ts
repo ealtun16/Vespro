@@ -103,6 +103,7 @@ export interface IStorage {
 
   // Tank Order methods  
   createSheetUpload(upload: InsertSheetUpload): Promise<SheetUpload>;
+  getSheetUpload(id: string): Promise<SheetUpload | undefined>;
   updateSheetUpload(id: string, upload: Partial<InsertSheetUpload>): Promise<SheetUpload | undefined>;
   createTankOrder(order: InsertTankOrder): Promise<TankOrder>;
   updateTankOrder(id: string, order: Partial<InsertTankOrder>): Promise<TankOrder | undefined>;
@@ -638,6 +639,14 @@ export class DatabaseStorage implements IStorage {
   async createSheetUpload(upload: InsertSheetUpload): Promise<SheetUpload> {
     const [newUpload] = await db.insert(sheetUpload).values(upload).returning();
     return newUpload;
+  }
+
+  async getSheetUpload(id: string): Promise<SheetUpload | undefined> {
+    const [upload] = await db
+      .select()
+      .from(sheetUpload)
+      .where(eq(sheetUpload.id, BigInt(id)));
+    return upload || undefined;
   }
 
   async updateSheetUpload(id: string, upload: Partial<InsertSheetUpload>): Promise<SheetUpload | undefined> {

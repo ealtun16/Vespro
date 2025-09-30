@@ -652,6 +652,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get Excel file for tank order
+  app.get("/api/tank-orders/:id/excel", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const orderData = await storage.getTankOrderWithItems(id);
+      
+      if (!orderData || !orderData.order.source_sheet_id) {
+        return res.status(404).json({ message: "Excel file not found" });
+      }
+
+      const sheetData = await storage.getSheetUpload(String(orderData.order.source_sheet_id));
+      
+      if (!sheetData || !sheetData.file_data) {
+        return res.status(404).json({ message: "Excel file data not found" });
+      }
+
+      // Parse Excel and return HTML table
+      const fileBuffer = Buffer.from(sheetData.file_data, 'base64');
+      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      
+      // Convert to HTML
+      const html = XLSX.utils.sheet_to_html(worksheet);
+      
+      res.json({
+        filename: sheetData.filename,
+        sheetName: sheetData.sheet_name,
+        html: html,
+        uploadedAt: sheetData.uploaded_at
+      });
+    } catch (error) {
+      console.error("Error fetching Excel file:", error);
+      res.status(500).json({ message: "Failed to fetch Excel file" });
+    }
+  });
+
   // Get tank order with cost items
   app.get("/api/tank-orders/:id", async (req, res) => {
     try {
@@ -802,13 +838,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .update(req.file.buffer)
         .digest('hex');
 
-      // Create sheet upload record
+      // Create sheet upload record with file data
+      const fileDataBase64 = req.file.buffer.toString('base64');
       const sheetUpload = await storage.createSheetUpload({
         filename: req.file.originalname,
         sheet_name: sheetName,
         file_hash_sha1: fileHash,
         first_data_row: 8,
-        last_data_row: null
+        last_data_row: null,
+        file_data: fileDataBase64
       });
 
       // Parse header data - FINAL CORRECTED mapping

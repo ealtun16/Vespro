@@ -409,20 +409,34 @@ export default function Dashboard() {
   };
 
   const handleViewExcel = async (orderId: string) => {
+    console.log('Excel görüntüleme başlatılıyor, order ID:', orderId);
     setExcelLoading(true);
     setExcelViewOpen(true);
     try {
       const response = await fetch(`/api/tank-orders/${orderId}/excel`);
+      console.log('Excel API yanıtı:', response.status, response.ok);
+      
       if (!response.ok) {
-        throw new Error('Excel dosyası yüklenemedi');
+        const errorText = await response.text();
+        console.error('Excel API hatası:', errorText);
+        throw new Error(`Excel dosyası yüklenemedi: ${response.status}`);
       }
+      
       const data = await response.json();
+      console.log('Excel verisi alındı:', {
+        filename: data.filename,
+        hasHtml: !!data.html,
+        hasFileData: !!data.fileData,
+        htmlLength: data.html?.length,
+        fileDataLength: data.fileData?.length
+      });
+      
       setExcelViewData(data);
     } catch (error) {
       console.error('Excel görüntüleme hatası:', error);
       toast({
         title: "Hata",
-        description: "Excel dosyası görüntülenirken hata oluştu",
+        description: error instanceof Error ? error.message : "Excel dosyası görüntülenirken hata oluştu",
         variant: "destructive",
       });
       setExcelViewOpen(false);

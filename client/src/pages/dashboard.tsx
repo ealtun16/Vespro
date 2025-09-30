@@ -18,6 +18,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -99,6 +109,8 @@ export default function Dashboard() {
   const [selectedAnalysis, setSelectedAnalysis] = useState<any>(null);
   const [editMode, setEditMode] = useState(false);
   const [editingAnalysis, setEditingAnalysis] = useState<any>(null);
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Fetch Turkish cost analyses
@@ -250,6 +262,30 @@ export default function Dashboard() {
       toast({
         title: "Hata",
         description: errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTankOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      return await apiRequest("DELETE", `/api/tank-orders/${orderId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tank-orders"] });
+      refetchTankOrders();
+      setDeleteDialogOpen(false);
+      setDeleteOrderId(null);
+      toast({
+        title: "Başarılı",
+        description: "Form başarıyla silindi",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Tank order delete error:", error);
+      toast({
+        title: "Hata",
+        description: "Form silinirken hata oluştu",
         variant: "destructive",
       });
     },
@@ -1100,14 +1136,27 @@ export default function Dashboard() {
                     <TableCell data-testid={`text-material-${order.id}`}>{order.material_grade || "-"}</TableCell>
                     <TableCell data-testid={`text-diameter-${order.id}`}>{order.diameter_mm || "-"}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(`/tank-order/${order.id}`, '_blank')}
-                        data-testid={`button-view-order-${order.id}`}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`/tank-order/${order.id}`, '_blank')}
+                          data-testid={`button-view-order-${order.id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setDeleteOrderId(order.id);
+                            setDeleteDialogOpen(true);
+                          }}
+                          data-testid={`button-delete-order-${order.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1240,6 +1289,32 @@ export default function Dashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Tank Order Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Formu Silmek İstediğinize Emin Misiniz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu işlem geri alınamaz. Form ve ilgili tüm maliyet verileri kalıcı olarak silinecektir.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteOrderId) {
+                  deleteTankOrderMutation.mutate(deleteOrderId);
+                }
+              }}
+              data-testid="button-confirm-delete"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -653,6 +653,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete tank order
+  app.delete("/api/tank-orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteTankOrder(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Tank order not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting tank order:", error);
+      res.status(500).json({ message: "Failed to delete tank order" });
+    }
+  });
+
   // ========================================
   // EXCEL UPLOAD ROUTE 
   // ========================================

@@ -724,6 +724,11 @@ export class DatabaseStorage implements IStorage {
     `);
     return (result.rows[0] as any).id;
   }
+
+  async deleteTankOrder(id: string): Promise<boolean> {
+    const result = await db.delete(tankOrder).where(eq(tankOrder.id, BigInt(id)));
+    return (result.rowCount || 0) > 0;
+  }
 }
 
 export const storage = new DatabaseStorage();

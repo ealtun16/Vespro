@@ -1,0 +1,268 @@
+BEGIN;
+
+-- ================================
+-- SÖZLÜKLER
+-- ================================
+CREATE TABLE IF NOT EXISTS uom_unit (
+  id    SMALLSERIAL PRIMARY KEY,
+  code  TEXT UNIQUE NOT NULL,
+  label TEXT
+);
+
+CREATE TABLE IF NOT EXISTS material_quality (
+  id    SMALLSERIAL PRIMARY KEY,
+  name  TEXT UNIQUE NOT NULL,
+  note  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS material_type (
+  id    SMALLSERIAL PRIMARY KEY,
+  name  TEXT UNIQUE NOT NULL,
+  note  TEXT
+);
+
+-- ================================
+-- KAYNAK DOSYA / SİPARİŞ BAŞLIĞI
+-- ================================
+CREATE TABLE IF NOT EXISTS sheet_upload (
+  id              BIGSERIAL PRIMARY KEY,
+  filename        TEXT NOT NULL,
+  sheet_name      TEXT NOT NULL,
+  uploaded_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  file_hash_sha1  TEXT,
+  first_data_row  INT DEFAULT 8,
+  last_data_row   INT
+);
+
+CREATE TABLE IF NOT EXISTS tank_order (
+  id                   BIGSERIAL PRIMARY KEY,
+  source_sheet_id      BIGINT REFERENCES sheet_upload(id) ON DELETE SET NULL,
+
+  order_code           TEXT UNIQUE,
+  customer_name        TEXT,
+  project_code         TEXT,
+  material_grade       TEXT,
+  quantity             NUMERIC CHECK (quantity >= 0),
+
+  diameter_mm          NUMERIC(12,3) CHECK (diameter_mm >= 0),
+  length_mm            NUMERIC(12,3) CHECK (length_mm  >= 0),
+  pressure_text        TEXT,
+  pressure_bar         NUMERIC(10,3),
+
+  total_weight_kg      NUMERIC(14,3) CHECK (total_weight_kg >= 0),
+  total_price_eur      NUMERIC(14,2) CHECK (total_price_eur >= 0),
+  created_date         DATE,
+
+  revision_text        TEXT,
+  revision_no          TEXT,
+  category_label       TEXT,
+  temperature_c        NUMERIC(8,2),
+
+  extra_head_json      JSONB
+);
+
+CREATE TABLE IF NOT EXISTS tank_order_header_raw (
+  id             BIGSERIAL PRIMARY KEY,
+  order_id       BIGINT NOT NULL REFERENCES tank_order(id) ON DELETE CASCADE,
+  excel_col_idx  INT NOT NULL,
+  excel_row_idx  INT NOT NULL,
+  cell_a1        TEXT,
+  raw_value      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_header_raw_order ON tank_order_header_raw(order_id);
+
+-- ================================
+-- COST ITEM (B..T sütunları, veri D8'den itibaren)
+-- ================================
+CREATE TABLE IF NOT EXISTS cost_item (
+  id                    BIGSERIAL PRIMARY KEY,
+  order_id              BIGINT NOT NULL REFERENCES tank_order(id) ON DELETE CASCADE,
+
+  group_no              INT,                         -- B
+  line_no               INT,                         -- C
+  factor_name           TEXT,                        -- D (MALİYET FAKTÖRÜ)
+
+  material_quality_id   SMALLINT REFERENCES material_quality(id) ON DELETE SET NULL, -- E
+  material_type_id      SMALLINT REFERENCES material_type(id)    ON DELETE SET NULL, -- F
+
+  -- G/H/I/J: ebatlar
+  dim_g_mm              NUMERIC(12,3) CHECK (dim_g_mm >= 0),      -- G
+  dim_h_mm              NUMERIC(12,3) CHECK (dim_h_mm >= 0),      -- H
+  dim_i_mm_kg           NUMERIC(12,3) CHECK (dim_i_mm_kg >= 0),   -- I (mm-kg hibrit başlık)
+  kg_per_m              NUMERIC(12,5) CHECK (kg_per_m >= 0),      -- J (kg/m)
+
+  quantity              NUMERIC(14,3) CHECK (quantity   >= 0),    -- K (ADET)
+  total_qty             NUMERIC(14,3) CHECK (total_qty  >= 0),    -- L (TOPLAM MİKTAR)
+  unit_id               SMALLINT REFERENCES uom_unit(id),         -- M (BİRİM)
+
+  unit_price_eur        NUMERIC(14,4) CHECK (unit_price_eur >= 0),-- N
+  line_total_eur        NUMERIC(14,2) CHECK (line_total_eur >= 0),-- O
+
+  material_status       TEXT,                         -- P
+  is_atolye_iscilik     BOOLEAN,                      -- Q
+  is_dis_tedarik        BOOLEAN,                      -- R
+  is_atolye_iscilik_2   BOOLEAN,                      -- T
+
+  note                  TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_cost_item_order_line
+  ON cost_item(order_id, group_no, line_no)
+  WHERE group_no IS NOT NULL AND line_no IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS cost_item_raw (
+  id               BIGSERIAL PRIMARY KEY,
+  order_id         BIGINT NOT NULL REFERENCES tank_order(id) ON DELETE CASCADE,
+  row_idx          INT NOT NULL,
+  col_b_to_t_json  JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_cost_item_raw_order ON cost_item_raw(order_id);
+
+-- ================================
+-- İŞÇİLİK / TARİFE / KAYIT
+-- ================================
+CREATE TABLE IF NOT EXISTS labor_role (
+  id           SMALLSERIAL PRIMARY KEY,
+  role_name    TEXT UNIQUE NOT NULL,
+  description  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS labor_rate (
+  id             BIGSERIAL PRIMARY KEY,
+  role_id        SMALLINT NOT NULL REFERENCES labor_role(id) ON DELETE CASCADE,
+  valid_from     DATE NOT NULL,
+  valid_to       DATE,
+  day_rate_eur   NUMERIC(12,2) NOT NULL CHECK (day_rate_eur >= 0)
+);
+CREATE INDEX IF NOT EXISTS idx_labor_rate_range ON labor_rate(role_id, valid_from, valid_to);
+
+CREATE TABLE IF NOT EXISTS labor_log (
+  id             BIGSERIAL PRIMARY KEY,
+  order_id       BIGINT NOT NULL REFERENCES tank_order(id) ON DELETE CASCADE,
+  role_id        SMALLINT NOT NULL REFERENCES labor_role(id) ON DELETE RESTRICT,
+  work_type      TEXT,
+  work_date      DATE NOT NULL,
+  man_days       NUMERIC(8,3) NOT NULL CHECK (man_days > 0),
+  note           TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_labor_log_order_date ON labor_log(order_id, work_date);
+
+-- ================================
+-- "YAN SÜTUNLAR BOŞSA FAKTÖRÜ TEK BAŞINA EKLEME" KISITI
+-- (Sürüm uyumlu yol: IMMUTABLE fonksiyon + CHECK)
+-- ================================
+CREATE OR REPLACE FUNCTION ci_has_side_data(
+  _material_quality_id smallint,
+  _material_type_id    smallint,
+  _dim_g_mm            numeric,
+  _dim_h_mm            numeric,
+  _dim_i_mm_kg         numeric,
+  _kg_per_m            numeric,
+  _quantity            numeric,
+  _total_qty           numeric,
+  _unit_id             smallint,
+  _unit_price_eur      numeric,
+  _line_total_eur      numeric,
+  _material_status     text,
+  _is_atolye_iscilik   boolean,
+  _is_dis_tedarik      boolean,
+  _is_atolye_iscilik_2 boolean
+) RETURNS boolean
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT
+    COALESCE(_material_quality_id::text,'') <> '' OR
+    COALESCE(_material_type_id::text,'')    <> '' OR
+    COALESCE(_dim_g_mm,0)                   <> 0 OR
+    COALESCE(_dim_h_mm,0)                   <> 0 OR
+    COALESCE(_dim_i_mm_kg,0)                <> 0 OR
+    COALESCE(_kg_per_m,0)                   <> 0 OR
+    COALESCE(_quantity,0)                   <> 0 OR
+    COALESCE(_total_qty,0)                  <> 0 OR
+    COALESCE(_unit_id::text,'')             <> '' OR
+    COALESCE(_unit_price_eur,0)             <> 0 OR
+    COALESCE(_line_total_eur,0)             <> 0 OR
+    COALESCE(_material_status,'')           <> '' OR
+    COALESCE(_is_atolye_iscilik,false)      <> false OR
+    COALESCE(_is_dis_tedarik,false)         <> false OR
+    COALESCE(_is_atolye_iscilik_2,false)    <> false
+$$;
+
+-- Önce varsa eski kısıtı düşür (idempotent davranış)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'ck_cost_item_not_lonely_factor_fn'
+  ) THEN
+    ALTER TABLE cost_item DROP CONSTRAINT ck_cost_item_not_lonely_factor_fn;
+  END IF;
+END$$;
+
+ALTER TABLE cost_item
+ADD CONSTRAINT ck_cost_item_not_lonely_factor_fn
+CHECK (
+  factor_name IS NULL OR
+  ci_has_side_data(
+    material_quality_id,
+    material_type_id,
+    dim_g_mm,
+    dim_h_mm,
+    dim_i_mm_kg,
+    kg_per_m,
+    quantity,
+    total_qty,
+    unit_id,
+    unit_price_eur,
+    line_total_eur,
+    material_status,
+    is_atolye_iscilik,
+    is_dis_tedarik,
+    is_atolye_iscilik_2
+  )
+);
+
+-- ================================
+-- ÖZET GÖRÜNÜM (satır toplamı + işçilik)
+-- ================================
+CREATE OR REPLACE VIEW v_order_cost_summary AS
+SELECT
+  o.id                                AS order_id,
+  o.order_code,
+  o.customer_name,
+  o.created_date,
+  COALESCE(o.total_price_eur, 0)        AS header_total_eur,
+  COALESCE(SUM(ci.line_total_eur), 0)    AS items_total_eur,
+  COALESCE((
+    SELECT SUM(ll.man_days * lr.day_rate_eur)
+    FROM labor_log ll
+    JOIN LATERAL (
+      SELECT lr2.day_rate_eur
+      FROM labor_rate lr2
+      WHERE lr2.role_id = ll.role_id
+        AND lr2.valid_from <= ll.work_date
+        AND (lr2.valid_to IS NULL OR lr2.valid_to >= ll.work_date)
+      ORDER BY lr2.valid_from DESC
+      LIMIT 1
+    ) lr ON TRUE
+    WHERE ll.order_id = o.id
+  ), 0) AS labor_total_eur,
+  COALESCE(SUM(ci.line_total_eur), 0) +
+  COALESCE((
+    SELECT SUM(ll.man_days * lr.day_rate_eur)
+    FROM labor_log ll
+    JOIN LATERAL (
+      SELECT lr2.day_rate_eur
+      FROM labor_rate lr2
+      WHERE lr2.role_id = ll.role_id
+        AND lr2.valid_from <= ll.work_date
+        AND (lr2.valid_to IS NULL OR lr2.valid_to >= ll.work_date)
+      ORDER BY lr2.valid_from DESC
+      LIMIT 1
+    ) lr ON TRUE
+    WHERE ll.order_id = o.id
+  ), 0) AS computed_grand_total_eur
+FROM tank_order o
+LEFT JOIN cost_item ci ON ci.order_id = o.id
+GROUP BY o.id, o.order_code, o.customer_name, o.created_date, o.total_price_eur;
+
+COMMIT;

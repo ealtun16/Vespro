@@ -1429,27 +1429,16 @@ export default function Dashboard() {
                 {excelViewData?.filename || 'Excel Dosyası'}
               </h2>
               <div className="flex items-center gap-2">
-                {excelViewData?.fileData && (
+                {excelViewData?.filePath && (
                   <Button
                     onClick={() => {
                       try {
-                        const binaryString = atob(excelViewData.fileData);
-                        const bytes = new Uint8Array(binaryString.length);
-                        for (let i = 0; i < binaryString.length; i++) {
-                          bytes[i] = binaryString.charCodeAt(i);
-                        }
-                        
-                        const blob = new Blob([bytes], { 
-                          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-                        });
-                        const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
-                        a.href = url;
+                        a.href = excelViewData.filePath;
                         a.download = excelViewData.filename;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
                         
                         toast({
                           title: "Başarılı",

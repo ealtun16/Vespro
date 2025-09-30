@@ -1,4 +1,5 @@
 import type { Express, Request } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterialSchema, insertSettingsSchema, insertTurkishCostAnalysisSchema, insertTurkishCostItemSchema } from "@shared/schema";
@@ -6,10 +7,30 @@ import * as XLSX from "xlsx";
 import { CostAnalysisEngine } from "./cost-analysis-engine";
 import multer from "multer";
 import crypto from "crypto";
+import path from "path";
+import fs from "fs";
 
-// Multer configuration for Excel upload
+// Ensure uploads directory exists
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Multer configuration for Excel upload - save to disk
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+      // Keep original filename with timestamp to avoid conflicts
+      const timestamp = Date.now();
+      const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+      const ext = path.extname(originalName);
+      const basename = path.basename(originalName, ext);
+      cb(null, `${basename}_${timestamp}${ext}`);
+    }
+  }),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
@@ -24,6 +45,12 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve uploaded files - use express.static for secure file serving
+  app.use('/uploads', express.static(uploadsDir, { 
+    index: false,
+    dotfiles: 'deny'
+  }));
+
   // Dashboard stats
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
@@ -664,12 +691,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const sheetData = await storage.getSheetUpload(String(orderData.order.source_sheet_id));
       
-      if (!sheetData || !sheetData.file_data) {
-        return res.status(404).json({ message: "Excel file data not found" });
+      if (!sheetData || !sheetData.file_path) {
+        return res.status(404).json({ message: "Excel file not found" });
       }
 
-      // Parse Excel and return HTML table
-      const fileBuffer = Buffer.from(sheetData.file_data, 'base64');
+      // Read Excel file from disk
+      const filePath = path.join(uploadsDir, sheetData.file_path);
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Excel file not found on disk" });
+      }
+
+      const fileBuffer = fs.readFileSync(filePath);
       const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       
@@ -680,7 +713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filename: sheetData.filename,
         sheetName: sheetData.sheet_name,
         html: html,
-        fileData: sheetData.file_data,
+        filePath: `/uploads/${sheetData.file_path}`,
         uploadedAt: sheetData.uploaded_at
       });
     } catch (error) {
@@ -828,26 +861,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dictUpserts: { units: 0, qualities: 0, types: 0 }
       };
 
-      // Parse Excel file
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      // Read Excel file from disk
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       
       // Get the file hash
       const fileHash = crypto
         .createHash('sha1')
-        .update(req.file.buffer)
+        .update(fileBuffer)
         .digest('hex');
 
-      // Create sheet upload record with file data
-      const fileDataBase64 = req.file.buffer.toString('base64');
+      // Create sheet upload record with file path
       const sheetUpload = await storage.createSheetUpload({
         filename: req.file.originalname,
         sheet_name: sheetName,
         file_hash_sha1: fileHash,
         first_data_row: 8,
         last_data_row: null,
-        file_data: fileDataBase64
+        file_path: req.file.filename // Store only filename, not full path
       });
 
       // Parse header data - FINAL CORRECTED mapping

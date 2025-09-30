@@ -746,6 +746,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     return null;
   };
+
+  // Helper function to parse Excel date values
+  const parseExcelDate = (value: any): string | null => {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    
+    // If it's already a Date object
+    if (value instanceof Date) {
+      return value.toISOString().split('T')[0];
+    }
+    
+    // If it's an Excel serial number (number of days since 1900-01-01)
+    if (typeof value === 'number') {
+      // Excel epoch: December 30, 1899 (not January 1, 1900 due to Excel's bug)
+      const EXCEL_EPOCH = new Date(1899, 11, 30).getTime();
+      const date = new Date(EXCEL_EPOCH + value * 86400000);
+      return date.toISOString().split('T')[0];
+    }
+    
+    // If it's a string, try to parse it
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+    }
+    
+    return null;
+  };
   
   app.post("/api/excel/upload", upload.single('file'), async (req, res) => {
     try {
@@ -792,7 +822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         diameter_mm: parseNumeric(worksheet['I2']?.v),               // I2: Tank çapı
         length_mm: parseNumeric(worksheet['K2']?.v),                 // K2: Silindir uzunluğu
         total_price_eur: parseNumeric(worksheet['P2']?.v),           // P2: Satış fiyatı (Toplam €)
-        created_date: worksheet['N2']?.v ? new Date(worksheet['N2'].v).toISOString().split('T')[0] : null,  // N2: Oluşturma tarihi
+        created_date: parseExcelDate(worksheet['N2']?.v),            // N2: Oluşturma tarihi
         temperature_c: parseNumeric(worksheet['R2']?.v),
         revision_text: worksheet['E3']?.v || '',
         category_label: worksheet['F3']?.v || '',

@@ -113,9 +113,6 @@ export default function Dashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteAnalysisId, setDeleteAnalysisId] = useState<string | null>(null);
   const [deleteAnalysisDialogOpen, setDeleteAnalysisDialogOpen] = useState(false);
-  const [excelViewOpen, setExcelViewOpen] = useState(false);
-  const [excelViewData, setExcelViewData] = useState<any>(null);
-  const [excelLoading, setExcelLoading] = useState(false);
   const { toast } = useToast();
 
   // Fetch Turkish cost analyses
@@ -405,43 +402,6 @@ export default function Dashboard() {
         description: "Analiz verileri yüklenemedi",
         variant: "destructive",
       });
-    }
-  };
-
-  const handleViewExcel = async (orderId: string) => {
-    console.log('Excel görüntüleme başlatılıyor, order ID:', orderId);
-    setExcelLoading(true);
-    setExcelViewOpen(true);
-    try {
-      const response = await fetch(`/api/tank-orders/${orderId}/excel`);
-      console.log('Excel API yanıtı:', response.status, response.ok);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Excel API hatası:', errorText);
-        throw new Error(`Excel dosyası yüklenemedi: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Excel verisi alındı:', {
-        filename: data.filename,
-        hasHtml: !!data.html,
-        hasFileData: !!data.fileData,
-        htmlLength: data.html?.length,
-        fileDataLength: data.fileData?.length
-      });
-      
-      setExcelViewData(data);
-    } catch (error) {
-      console.error('Excel görüntüleme hatası:', error);
-      toast({
-        title: "Hata",
-        description: error instanceof Error ? error.message : "Excel dosyası görüntülenirken hata oluştu",
-        variant: "destructive",
-      });
-      setExcelViewOpen(false);
-    } finally {
-      setExcelLoading(false);
     }
   };
 
@@ -1163,13 +1123,15 @@ export default function Dashboard() {
                     <TableRow key={order.id}>
                       <TableCell data-testid={`text-kod-${order.id}`} className="font-medium">
                         {order.source_kind === 'Excel' ? (
-                          <button
-                            onClick={() => handleViewExcel(order.id)}
+                          <a
+                            href={`/excel-view/${order.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="text-blue-600 hover:underline cursor-pointer"
-                            data-testid={`button-view-excel-${order.id}`}
+                            data-testid={`link-view-excel-${order.id}`}
                           >
                             {order.kod || '-'}
-                          </button>
+                          </a>
                         ) : (
                           <span>{order.kod || '-'}</span>
                         )}
@@ -1427,120 +1389,6 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Excel View Dialog - Full Screen */}
-      {excelViewOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop with blur */}
-          <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setExcelViewOpen(false)}
-          />
-          
-          {/* Modal Content */}
-          <div className="relative z-10 bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-[95vw] h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">
-                {excelViewData?.filename || 'Excel Dosyası'}
-              </h2>
-              <div className="flex items-center gap-2">
-                {excelViewData && excelViewData.fileData && (
-                  <Button
-                    onClick={() => {
-                      try {
-                        // Decode base64 to binary
-                        const binaryString = atob(excelViewData.fileData);
-                        const bytes = new Uint8Array(binaryString.length);
-                        for (let i = 0; i < binaryString.length; i++) {
-                          bytes[i] = binaryString.charCodeAt(i);
-                        }
-                        
-                        // Create blob and download
-                        const blob = new Blob([bytes], { 
-                          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-                        });
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = excelViewData.filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
-                        
-                        toast({
-                          title: "Başarılı",
-                          description: "Excel dosyası indirildi",
-                        });
-                      } catch (error) {
-                        console.error('İndirme hatası:', error);
-                        toast({
-                          title: "Hata",
-                          description: "Excel dosyası indirilemedi",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                    variant="outline"
-                    size="sm"
-                    data-testid="button-download-excel"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    İndir
-                  </Button>
-                )}
-                <Button
-                  onClick={() => setExcelViewOpen(false)}
-                  variant="ghost"
-                  size="sm"
-                  data-testid="button-close-excel"
-                >
-                  Kapat
-                </Button>
-              </div>
-            </div>
-            
-            {/* Content */}
-            <div className="flex-1 overflow-auto p-4">
-              {excelLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-muted-foreground">Yükleniyor...</div>
-                </div>
-              ) : excelViewData ? (
-                <div 
-                  dangerouslySetInnerHTML={{ __html: excelViewData.html }}
-                  className="excel-table"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-muted-foreground">Excel verisi bulunamadı</div>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <style>{`
-            .excel-table table {
-              border-collapse: collapse;
-              width: 100%;
-              font-family: Arial, sans-serif;
-              font-size: 11px;
-            }
-            .excel-table td, .excel-table th {
-              border: 1px solid #ddd;
-              padding: 6px 10px;
-              text-align: left;
-              white-space: nowrap;
-            }
-            .excel-table tr:nth-child(even) {
-              background-color: #f9f9f9;
-            }
-            .excel-table tr:hover {
-              background-color: #f0f0f0;
-            }
-          `}</style>
-        </div>
-      )}
     </div>
   );
 }

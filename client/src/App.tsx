@@ -9,19 +9,25 @@ import Dashboard from "@/pages/dashboard";
 import TankSpecifications from "@/pages/tank-specifications";
 import Reports from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
+import ExcelViewer from "@/pages/excel-viewer";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/tank-specifications" component={TankSpecifications} />
-        <Route path="/reports" component={Reports} />
-        <Route path="/settings" component={SettingsPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      <Route path="/excel-view/:orderId" component={ExcelViewer} />
+      <Route path="*">
+        <Layout>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/tank-specifications" component={TankSpecifications} />
+            <Route path="/reports" component={Reports} />
+            <Route path="/settings" component={SettingsPage} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 

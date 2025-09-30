@@ -1099,7 +1099,7 @@ export default function Dashboard() {
                   <TableHead>Müşteri / Proje</TableHead>
                   <TableHead>Tank Özeti</TableHead>
                   <TableHead className="text-right">Kalem</TableHead>
-                  <TableHead className="text-right">Malzeme €</TableHead>
+                  <TableHead className="text-right">Toplam Malzeme Kg</TableHead>
                   <TableHead className="text-right">İşçilik €</TableHead>
                   <TableHead className="text-right">Dış Ted. €</TableHead>
                   <TableHead className="text-right">Toplam €</TableHead>
@@ -1148,8 +1148,8 @@ export default function Dashboard() {
                       <TableCell data-testid={`text-item-count-${order.id}`} className="text-right" title="Toplam kalem sayısı">
                         {order.item_count || 0}
                       </TableCell>
-                      <TableCell data-testid={`text-materials-${order.id}`} className="text-right">
-                        €{parseFloat(order.materials_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                      <TableCell data-testid={`text-total-weight-${order.id}`} className="text-right">
+                        {parseFloat(order.total_weight_kg || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg
                       </TableCell>
                       <TableCell data-testid={`text-labor-${order.id}`} className="text-right">
                         €{parseFloat(order.labor_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
@@ -1158,7 +1158,7 @@ export default function Dashboard() {
                         €{parseFloat(order.outsource_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                       </TableCell>
                       <TableCell data-testid={`text-total-${order.id}`} className="text-right font-bold">
-                        €{parseFloat(order.total_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        €{parseFloat(order.total_price_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                       </TableCell>
                       <TableCell data-testid={`text-source-${order.id}`}>
                         <span 

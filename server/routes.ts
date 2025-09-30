@@ -782,23 +782,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Parse header data - FINAL CORRECTED mapping
-      // D2=Kod, D3=Müşteri adı
-      // I2=Tank çapı, K2=Silindir uzunluğu, P2=Satış fiyatı
-      // H3=Hacim, I3=Ürün kalitesi, K3=Basınç, P3=Toplam ağırlık
+      // D2=Kod, D3=Müşteri adı, N2=Oluşturma tarihi
+      // I2=Tank çapı, K2=Silindir uzunluğu, P2=Satış fiyatı (Toplam €)
+      // H3=Hacim, I3=Ürün kalitesi, K3=Basınç, P3=Toplam ağırlık (kg)
       const headerData = {
         order_code: worksheet['D2']?.v || `ORDER-${Date.now()}`,     // D2: Kod
         customer_name: worksheet['D3']?.v || '',                     // D3: Müşteri adı
         project_code: worksheet['H2']?.v || '',
         diameter_mm: parseNumeric(worksheet['I2']?.v),               // I2: Tank çapı
         length_mm: parseNumeric(worksheet['K2']?.v),                 // K2: Silindir uzunluğu
-        total_price_eur: parseNumeric(worksheet['P2']?.v),           // P2: Satış fiyatı
+        total_price_eur: parseNumeric(worksheet['P2']?.v),           // P2: Satış fiyatı (Toplam €)
+        created_date: worksheet['N2']?.v ? new Date(worksheet['N2'].v).toISOString().split('T')[0] : null,  // N2: Oluşturma tarihi
         temperature_c: parseNumeric(worksheet['R2']?.v),
         revision_text: worksheet['E3']?.v || '',
         category_label: worksheet['F3']?.v || '',
         quantity: parseNumeric(worksheet['H3']?.v),                  // H3: Hacim
         material_grade: worksheet['I3']?.v || '',                    // I3: Ürün kalitesi
         pressure_bar: parseNumeric(worksheet['K3']?.v),              // K3: Basınç
-        total_weight_kg: parseNumeric(worksheet['P3']?.v),           // P3: Toplam ağırlık
+        total_weight_kg: parseNumeric(worksheet['P3']?.v),           // P3: Toplam ağırlık (kg)
         revision_no: worksheet['P3']?.v || '',
         pressure_text: null,
       };

@@ -485,10 +485,10 @@ export default function Dashboard() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold" data-testid="text-page-title">
-            Türkçe Maliyet Analizi Dashboard
+            Maliyet Analiz Yönetimi
           </h1>
           <p className="mt-2 text-sm text-muted-foreground" data-testid="text-page-description">
-            Yeni maliyet analizi oluşturun ve mevcut analizleri görüntüleyin
+            Tank maliyet analizlerini oluşturun, görüntüleyin ve yönetin
           </p>
         </div>
 

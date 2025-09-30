@@ -1207,7 +1207,7 @@ export default function Dashboard() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(`/tank-order/${order.id}`, '_blank')}
+                            onClick={() => handleViewExcel(order.id)}
                             data-testid={`button-view-${order.id}`}
                           >
                             <Eye className="h-4 w-4" />

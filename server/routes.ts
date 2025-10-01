@@ -9,6 +9,7 @@ import multer from "multer";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
+import { z } from "zod";
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -39,6 +40,19 @@ const upload = multer({
       cb(new Error('Only Excel files are allowed'));
     }
   }
+});
+
+// Agent API validation schemas
+const agentChatSchema = z.object({
+  sessionId: z.string().optional(),
+  message: z.string().min(1).max(10000),
+  context: z.any().optional()
+});
+
+const agentAnalyzeSchema = z.object({
+  formData: z.any(), // Could be more specific based on tank spec schema
+  preliminaryPrice: z.number().optional(),
+  priceBreakdown: z.any().optional()
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -442,6 +456,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         res.status(500).json({ error: 'Failed to complete full analysis' });
+      }
+    }
+  });
+
+  // ========================================
+  // N8N AGENT INTEGRATION ROUTES
+  // ========================================
+  
+  // Chat with agent endpoint
+  app.post('/api/agent/chat', async (req, res) => {
+    try {
+      // Validate input
+      const validationResult = agentChatSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: 'Invalid request data',
+          details: validationResult.error.issues
+        });
+      }
+
+      const { sessionId, message, context } = validationResult.data;
+
+      // Get settings with API key (server-only)
+      const settings = await storage.getSettingsWithApiKey();
+      if (!settings || !settings.n8nEndpoint) {
+        return res.status(400).json({ 
+          error: 'Agent not configured. Please configure agent endpoints in Settings.' 
+        });
+      }
+
+      // Initialize agent with settings
+      const { createAgent } = await import('./agent');
+      const agent = createAgent({
+        chatEndpoint: settings.n8nEndpoint,
+        analyzeEndpoint: settings.n8nEndpoint,
+        apiKey: settings.n8nApiKey || undefined,
+        apiKeyHeader: 'X-N8N-API-KEY'
+      });
+
+      // Call agent
+      const response = await agent.chat({
+        sessionId,
+        message,
+        context
+      });
+
+      if (!response.success) {
+        // Sanitized error response - don't expose upstream details
+        console.error('[API] Agent chat failed:', response.error);
+        return res.status(502).json({ 
+          error: 'Agent communication failed. Please try again.' 
+        });
+      }
+
+      res.json({
+        success: true,
+        reply: response.data,
+        agentRunId: response.agentRunId,
+        tokens: response.tokens
+      });
+
+    } catch (error: any) {
+      console.error('[API] Agent chat error:', error);
+      res.status(500).json({ error: 'Failed to process chat request' });
+    }
+  });
+
+  // Analyze tank specs with agent endpoint
+  app.post('/api/agent/analyze', async (req, res) => {
+    try {
+      // Validate input
+      const validationResult = agentAnalyzeSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: 'Invalid request data',
+          details: validationResult.error.issues
+        });
+      }
+
+      const { formData, preliminaryPrice, priceBreakdown } = validationResult.data;
+
+      // Get settings with API key (server-only)
+      const settings = await storage.getSettingsWithApiKey();
+      if (!settings || !settings.n8nEndpoint) {
+        return res.status(400).json({ 
+          error: 'Agent not configured. Please configure agent endpoints in Settings.' 
+        });
+      }
+
+      // Initialize agent with settings
+      const { createAgent } = await import('./agent');
+      const agent = createAgent({
+        chatEndpoint: settings.n8nEndpoint,
+        analyzeEndpoint: settings.n8nEndpoint,
+        apiKey: settings.n8nApiKey || undefined,
+        apiKeyHeader: 'X-N8N-API-KEY'
+      });
+
+      // Call agent for analysis
+      const response = await agent.analyze({
+        formData,
+        preliminaryPrice,
+        priceBreakdown
+      });
+
+      if (!response.success) {
+        // Sanitized error response - don't expose upstream details
+        console.error('[API] Agent analyze failed:', response.error);
+        return res.status(502).json({ 
+          error: 'Agent analysis failed. Please try again.' 
+        });
+      }
+
+      res.json({
+        success: true,
+        analysis: response.data,
+        agentRunId: response.agentRunId,
+        tokens: response.tokens
+      });
+
+    } catch (error: any) {
+      console.error('[API] Agent analyze error:', error);
+      res.status(500).json({ error: 'Failed to process analysis request' });
+    }
+  });
+
+  // Preliminary price estimate endpoint (wrapper around existing calculate)
+  app.post('/api/analysis/estimate', async (req, res) => {
+    try {
+      const tankSpecData = insertTankSpecificationSchema.parse(req.body);
+      
+      // Get global settings for cost parameters
+      const globalSettings = await storage.getGlobalSettings();
+      if (!globalSettings) {
+        return res.status(400).json({ 
+          error: 'Global settings not configured. Please configure cost parameters in Settings.' 
+        });
+      }
+
+      // Calculate costs using the engine
+      const costBreakdown = await CostAnalysisEngine.calculateCosts({
+        tankSpec: tankSpecData,
+        settings: globalSettings
+      });
+
+      res.json({
+        success: true,
+        estimatedPrice: costBreakdown.totalCost,
+        breakdown: costBreakdown
+      });
+      
+    } catch (error: any) {
+      console.error('Estimate calculation error:', error);
+      if (error?.name === 'ZodError') {
+        res.status(400).json({ 
+          error: 'Invalid tank specification data', 
+          details: error.issues 
+        });
+      } else {
+        res.status(500).json({ error: 'Failed to calculate estimate' });
       }
     }
   });

@@ -3,11 +3,12 @@
  * Automatically calculates tank equipment costs based on specifications and rules
  */
 
-import type { InsertCostAnalysis, InsertTankSpecification, Settings } from "@shared/schema";
+import type { InsertCostAnalysis, InsertTankSpecification } from "@shared/schema";
+import type { SafeSettings } from "./storage";
 
 export interface CostCalculationInput {
   tankSpec: InsertTankSpecification;
-  settings: Settings;
+  settings: SafeSettings;
   materialPrices?: MaterialPriceMap;
 }
 
@@ -195,7 +196,7 @@ export class CostAnalysisEngine {
   private static calculateMaterialCost(
     tankSpec: InsertTankSpecification, 
     geometry: any, 
-    settings: Settings
+    settings: SafeSettings
   ): number {
     // Base steel price per kg from settings
     const steelPricePerKg = Number(settings.steelPricePerKg) || 2.5; // Default €2.5/kg
@@ -237,7 +238,7 @@ export class CostAnalysisEngine {
   private static calculateLaborCost(
     geometry: any, 
     complexityFactor: number, 
-    settings: Settings
+    settings: SafeSettings
   ): number {
     // Base labor calculation: surface area * complexity * hours per m²
     const baseHoursPerM2 = 0.8; // Base hours per square meter
@@ -263,7 +264,7 @@ export class CostAnalysisEngine {
   private static calculateOverheadCost(
     materialCost: number, 
     laborCost: number, 
-    settings: Settings
+    settings: SafeSettings
   ): number {
     const directCosts = materialCost + laborCost;
     

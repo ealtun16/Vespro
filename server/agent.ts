@@ -19,7 +19,7 @@ interface AgentChatRequest {
 
 interface AgentAnalyzeRequest {
   formData: any;
-  preliminaryPrice: number;
+  preliminaryPrice?: number;
   priceBreakdown?: any;
 }
 

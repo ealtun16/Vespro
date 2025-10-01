@@ -4,7 +4,9 @@ import {
   Settings, 
   FileSpreadsheet, 
   LayoutDashboard,
-  Factory
+  Factory,
+  MessageSquare,
+  ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
@@ -15,8 +17,10 @@ export default function Sidebar() {
   
   const navItems = [
     { href: "/", label: t('nav.dashboard'), icon: LayoutDashboard },
-    { href: "/tank-specifications", label: t('nav.tankSpecs'), icon: Factory },
+    { href: "/tank-analysis", label: t('nav.tankAnalysis'), icon: Factory },
+    { href: "/chat", label: t('nav.chat'), icon: MessageSquare },
     { href: "/reports", label: t('nav.reports'), icon: FileSpreadsheet },
+    { href: "/settings", label: t('nav.settings'), icon: Settings },
   ];
 
   return (

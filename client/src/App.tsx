@@ -6,7 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/lib/i18n";
 import Layout from "@/components/layout/layout";
 import Dashboard from "@/pages/dashboard";
-import TankSpecifications from "@/pages/tank-specifications";
+import TankAnalysis from "@/pages/tank-analysis";
+import Chat from "@/pages/chat";
 import Reports from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
@@ -16,7 +17,8 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
-        <Route path="/tank-specifications" component={TankSpecifications} />
+        <Route path="/tank-analysis" component={TankAnalysis} />
+        <Route path="/chat" component={Chat} />
         <Route path="/reports" component={Reports} />
         <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />

@@ -25,6 +25,8 @@ The frontend follows a structured component hierarchy with reusable UI component
 ### File Upload and Processing
 The system implements Excel file processing capabilities using the XLSX library for parsing spreadsheet data. File uploads are handled through multer middleware with memory storage, supporting validation for file types and size limits. The application can process complex Excel structures containing tank specifications and cost analysis data.
 
+**Multi-Sheet Upload Support**: The system now processes all sheets in an Excel workbook, creating separate tank orders for each sheet. Each sheet upload is tracked with metadata including sheet_name, sheet_index, source_kind (excel/manual), and source_filename. The upload process supports partial success scenarios where some sheets may fail while others succeed. Results are aggregated and reported to the user with detailed counts of successful and failed sheets. The frontend displays a toast notification showing the upload results and automatically opens a modal to preview the first successfully processed sheet. Excel files are stored in the `/uploads` directory with original filenames for later retrieval and preview.
+
 ### State Management Strategy
 Client state is managed through a combination of TanStack Query for server state, React Hook Form for form state, and local React state for UI interactions. The query client is configured with appropriate defaults for caching and refetching behavior, optimizing performance for data-heavy operations.
 

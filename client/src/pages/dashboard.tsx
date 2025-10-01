@@ -140,9 +140,7 @@ export default function Dashboard() {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data = await response.json();
-      console.log('Orders list data received:', data);
-      return data;
+      return await response.json();
     },
     staleTime: 0,
     refetchOnMount: true,
@@ -201,14 +199,6 @@ export default function Dashboard() {
     control: form.control,
     name: "cost_items",
   });
-
-  // Debug logging for orders list data
-  useEffect(() => {
-    if (ordersListData) {
-      console.log('Orders list data in component:', ordersListData);
-      console.log('Number of orders:', (ordersListData as any)?.orders?.length || 0);
-    }
-  }, [ordersListData]);
 
   const createAnalysisMutation = useMutation({
     mutationFn: async (data: TurkishCostAnalysisFormData) => {
@@ -544,10 +534,10 @@ export default function Dashboard() {
     }
   };
 
-  // Calculate summary statistics
-  const totalAnalyses = (analyses as any)?.total || 0;
-  const totalCost = (analyses as any)?.analyses?.reduce((sum: number, analysis: any) => {
-    return sum + (parseFloat(analysis.total_cost) || 0);
+  // Calculate summary statistics from orders list (includes both Excel and manual entries)
+  const totalAnalyses = (ordersListData as any)?.orders?.length || 0;
+  const totalCost = (ordersListData as any)?.orders?.reduce((sum: number, order: any) => {
+    return sum + (parseFloat(order.total_price_eur) || 0);
   }, 0) || 0;
 
   return (

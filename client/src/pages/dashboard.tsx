@@ -140,7 +140,9 @@ export default function Dashboard() {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('Orders list data received:', data);
+      return data;
     },
     staleTime: 0,
     refetchOnMount: true,
@@ -199,6 +201,14 @@ export default function Dashboard() {
     control: form.control,
     name: "cost_items",
   });
+
+  // Debug logging for orders list data
+  useEffect(() => {
+    if (ordersListData) {
+      console.log('Orders list data in component:', ordersListData);
+      console.log('Number of orders:', (ordersListData as any)?.orders?.length || 0);
+    }
+  }, [ordersListData]);
 
   const createAnalysisMutation = useMutation({
     mutationFn: async (data: TurkishCostAnalysisFormData) => {

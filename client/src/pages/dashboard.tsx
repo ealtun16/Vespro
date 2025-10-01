@@ -1147,17 +1147,7 @@ export default function Dashboard() {
                   return (
                     <TableRow key={order.id}>
                       <TableCell data-testid={`text-kod-${order.id}`} className="font-medium">
-                        {order.source_kind === 'Excel' ? (
-                          <button
-                            onClick={() => handleViewExcel(order.id)}
-                            className="text-blue-600 hover:underline cursor-pointer"
-                            data-testid={`button-view-excel-${order.id}`}
-                          >
-                            {order.kod || '-'}
-                          </button>
-                        ) : (
-                          <span>{order.kod || '-'}</span>
-                        )}
+                        {order.kod || '-'}
                       </TableCell>
                       <TableCell data-testid={`text-customer-${order.id}`}>
                         <div className="flex flex-col">

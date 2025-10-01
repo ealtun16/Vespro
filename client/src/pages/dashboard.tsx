@@ -1122,11 +1122,10 @@ export default function Dashboard() {
                 <TableRow>
                   <TableHead>Kod</TableHead>
                   <TableHead>Müşteri / Proje</TableHead>
-                  <TableHead>Tank Özeti</TableHead>
+                  <TableHead>Tank Ölçüleri</TableHead>
+                  <TableHead>Malzeme Kalitesi</TableHead>
                   <TableHead className="text-right">Toplam Malzeme Kg</TableHead>
-                  <TableHead className="text-right">İşçilik €</TableHead>
-                  <TableHead className="text-right">Dış Ted. €</TableHead>
-                  <TableHead className="text-right">Toplam €</TableHead>
+                  <TableHead className="text-right">Satış Fiyatı €</TableHead>
                   <TableHead>Kaynak</TableHead>
                   <TableHead>Oluşturma / Güncelleme</TableHead>
                   <TableHead>İşlemler</TableHead>
@@ -1134,11 +1133,10 @@ export default function Dashboard() {
               </TableHeader>
               <TableBody>
                 {(ordersListData as any)?.orders?.map((order: any) => {
-                  const tankSummary = [
+                  const tankDimensions = [
                     order.diameter_mm ? `Ø${parseFloat(order.diameter_mm).toFixed(0)}` : null,
                     order.length_mm ? `${parseFloat(order.length_mm).toFixed(0)}mm` : null,
                     order.pressure_bar ? `${parseFloat(order.pressure_bar).toFixed(1)} bar` : null,
-                    order.material_grade,
                   ].filter(Boolean).join(' × ');
 
                   const createdDate = order.created_date ? new Date(order.created_date).toLocaleDateString('tr-TR') : '-';
@@ -1159,17 +1157,14 @@ export default function Dashboard() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell data-testid={`text-tank-summary-${order.id}`}>
-                        {tankSummary || '-'}
+                      <TableCell data-testid={`text-tank-dimensions-${order.id}`}>
+                        {tankDimensions || '-'}
+                      </TableCell>
+                      <TableCell data-testid={`text-material-grade-${order.id}`}>
+                        {order.material_grade || '-'}
                       </TableCell>
                       <TableCell data-testid={`text-total-weight-${order.id}`} className="text-right">
                         {parseFloat(order.total_weight_kg || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} kg
-                      </TableCell>
-                      <TableCell data-testid={`text-labor-${order.id}`} className="text-right">
-                        €{parseFloat(order.labor_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                      </TableCell>
-                      <TableCell data-testid={`text-outsource-${order.id}`} className="text-right">
-                        €{parseFloat(order.outsource_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                       </TableCell>
                       <TableCell data-testid={`text-total-${order.id}`} className="text-right font-bold">
                         €{parseFloat(order.total_price_eur || 0).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
@@ -1222,7 +1217,7 @@ export default function Dashboard() {
                 {/* Empty State */}
                 {(!(ordersListData as any)?.orders || (ordersListData as any).orders.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       Henüz maliyet analizi bulunamadı. Manuel form oluşturmak veya Excel dosyası yüklemek için yukarıdaki butonları kullanın.
                     </TableCell>
                   </TableRow>

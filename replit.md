@@ -2,11 +2,50 @@
 
 ## Overview
 
-Vespro is a comprehensive web application designed for managing and analyzing industrial tank cost reports. The system specializes in handling cost analysis data for various types of industrial tanks including Storage Tanks, Pressure Vessels, and Heat Exchangers. It provides functionality for importing Excel data, managing tank specifications, performing cost analysis, and generating reports for industrial tank projects.
+Vespro is a comprehensive web application designed for managing and analyzing industrial tank cost reports. The system specializes in handling cost analysis data for various types of industrial tanks including Storage Tanks, Pressure Vessels, and Heat Exchangers. The application provides dual input modes: a form-based tank specifications interface with preliminary cost calculation, and an AI-powered chat assistant for natural language queries. The system integrates with n8n ChatGPT agents for intelligent cost analysis and project recommendations.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+## Recent Changes (October 2025)
+
+**Transform to "Form + Chat" Tool with n8n Agent Integration**
+
+The system is undergoing a major transformation to add AI-powered chat capabilities alongside the existing form-based workflow:
+
+### Completed Infrastructure (Tasks 1-5)
+1. **Database Schema Extensions**: Added `chat_sessions` and `chat_messages` tables with proper relationships. Extended settings table with n8n agent configuration fields (endpoint, API key). Implemented SafeSettings type to prevent API key exposure to frontend.
+
+2. **n8n Agent Service**: Created `server/agent.ts` with configurable HTTP integration supporting X-N8N-API-KEY headers. Implements retry logic with exponential backoff (1s base, 10s cap with jitter), retries on 5xx/429/network errors, and proper timeout cleanup with finally blocks.
+
+3. **Storage Layer Updates**: Added CRUD operations for chat sessions and messages. Implemented SafeSettings protection pattern where `getSettings()` returns sanitized data for client while `getSettingsWithApiKey()` provides full settings for server-only use. Added ordering by creation time for message history.
+
+4. **API Routes**: Three new endpoints with Zod validation:
+   - `POST /api/agent/chat`: Interactive chat with context awareness
+   - `POST /api/agent/analyze`: Tank specification analysis
+   - `POST /api/analysis/estimate`: Preliminary cost estimation
+   All routes sanitize upstream errors (502 for agent failures) and map HTTP status codes appropriately.
+
+5. **Navigation Structure**: Updated sidebar with five sections:
+   - Dashboard (/)
+   - Tank Analysis (/tank-analysis) - Form-based entry
+   - Chat (/chat) - Ask the Agent interface  
+   - Reports (/reports) - Existing reports view
+   - Settings (/settings) - API configuration
+
+### Remaining Work (Tasks 6-10)
+- Task 6: Implement Tank Analysis page with validated form → price estimate → agent analysis → persistence
+- Task 7: Implement Chat page with session management and message history
+- Task 8: Enhance Records/Reports page with analysis history, implement Settings page for n8n configuration
+- Task 9: Extract Excel overlay modal for reuse across pages
+- Task 10: End-to-end testing and flow validation
+
+### Security Architecture
+- **API Key Protection**: n8nApiKey never exposed to frontend; SafeSettings type enforced across all client-facing APIs
+- **Error Sanitization**: Upstream agent errors transformed to generic 502 responses
+- **Input Validation**: All API endpoints validate with Zod schemas before processing
+- **SSRF Awareness**: n8n endpoint configuration requires future auth/authorization controls
 
 ## System Architecture
 

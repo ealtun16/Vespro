@@ -212,8 +212,35 @@ export const settings = pgTable("settings", {
   // AI analysis preferences
   autoAnalysisEnabled: boolean("auto_analysis_enabled").default(true),
   analysisConfidenceThreshold: decimal("analysis_confidence_threshold", { precision: 3, scale: 2 }).default("0.80"), // 80%
+  // n8n Agent integration
+  n8nEndpoint: text("n8n_endpoint"), // n8n webhook URL
+  n8nApiKey: text("n8n_api_key"), // n8n API key (server-only)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Chat message role enum
+export const messageRoleEnum = pgEnum("message_role", ["user", "assistant", "system"]);
+
+// Chat sessions table
+export const chatSessions = pgTable("chat_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id), // null for anonymous sessions
+  lastFormId: varchar("last_form_id").references(() => turkishCostAnalyses.id), // Link to last analyzed form
+  title: text("title"), // Optional session title
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Chat messages table
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => chatSessions.id, { onDelete: "cascade" }),
+  role: messageRoleEnum("role").notNull(),
+  content: text("content").notNull(),
+  tokens: integer("tokens"), // Track token usage for cost monitoring
+  agentRunId: text("agent_run_id"), // n8n run ID for traceability
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // NEW CLEAN SCHEMA FOR TURKISH COST ANALYSIS FORMS
@@ -334,6 +361,15 @@ export const insertSettingsSchema = createInsertSchema(settings).omit({
   createdAt: true, 
   updatedAt: true 
 });
+export const insertChatSessionSchema = createInsertSchema(chatSessions).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ 
+  id: true, 
+  createdAt: true 
+});
 
 // New Turkish schemas with proper number handling
 export const insertTurkishCostAnalysisSchema = z.object({
@@ -388,6 +424,10 @@ export type CostAnalysisMaterial = typeof costAnalysisMaterials.$inferSelect;
 export type InsertCostAnalysisMaterial = z.infer<typeof insertCostAnalysisMaterialSchema>;
 export type Settings = typeof settings.$inferSelect;
 export type InsertSettings = z.infer<typeof insertSettingsSchema>;
+export type ChatSession = typeof chatSessions.$inferSelect;
+export type InsertChatSession = z.infer<typeof insertChatSessionSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 
 // New Turkish types
 export type TurkishCostAnalysis = typeof turkishCostAnalyses.$inferSelect;

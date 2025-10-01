@@ -5,6 +5,8 @@ import {
   materials,
   costAnalysisMaterials,
   settings,
+  chatSessions,
+  chatMessages,
   // Vespro schema
   vespro_forms,
   vespro_cost_items,
@@ -37,6 +39,10 @@ import {
   type InsertCostAnalysisMaterial,
   type Settings,
   type InsertSettings,
+  type ChatSession,
+  type InsertChatSession,
+  type ChatMessage,
+  type InsertChatMessage,
   // Vespro types
   type VesproForm,
   type InsertVesproForm,
@@ -53,6 +59,9 @@ import { eq, desc, like, and, or, sql } from "drizzle-orm";
 
 // Type for VesproForm without file_data (to prevent memory issues)
 type VesproFormWithoutFileData = Omit<VesproForm, 'file_data'>;
+
+// Type for Settings without sensitive data (to prevent exposure to frontend)
+export type SafeSettings = Omit<Settings, 'n8nApiKey'>;
 
 export interface IStorage {
   // User methods
@@ -96,10 +105,26 @@ export interface IStorage {
   // Dashboard stats
   getDashboardStats(): Promise<any>;
 
-  // Settings methods
-  getSettings(userId?: string): Promise<Settings | undefined>;
-  createSettings(settings: InsertSettings): Promise<Settings>;
-  updateSettings(id: string, settings: Partial<InsertSettings>): Promise<Settings | undefined>;
+  // Settings methods (safe versions without API key for frontend)
+  getSettings(userId?: string): Promise<SafeSettings | undefined>;
+  createSettings(settings: InsertSettings): Promise<SafeSettings>;
+  updateSettings(id: string, settings: Partial<InsertSettings>): Promise<SafeSettings | undefined>;
+  // Internal method with API key (server-only)
+  getSettingsWithApiKey(userId?: string): Promise<Settings | undefined>;
+  getGlobalSettings(): Promise<SafeSettings | undefined>;
+  getUserSettings(userId: string): Promise<SafeSettings | undefined>;
+
+  // Chat Session methods
+  createChatSession(session: InsertChatSession): Promise<ChatSession>;
+  getChatSession(id: string): Promise<ChatSession | undefined>;
+  getChatSessionsByUser(userId: string): Promise<ChatSession[]>;
+  updateChatSession(id: string, session: Partial<InsertChatSession>): Promise<ChatSession | undefined>;
+  deleteChatSession(id: string): Promise<boolean>;
+
+  // Chat Message methods
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  getChatMessages(sessionId: string): Promise<ChatMessage[]>;
+  getChatMessage(id: string): Promise<ChatMessage | undefined>;
 
   // Tank Order methods  
   createSheetUpload(upload: InsertSheetUpload): Promise<SheetUpload>;
@@ -114,8 +139,6 @@ export interface IStorage {
   updateTankOrder(id: string, order: Partial<InsertTankOrder>): Promise<TankOrder | undefined>;
   createCostItem(item: InsertCostItem): Promise<CostItem>;
   updateCostItem(id: string, item: Partial<InsertCostItem>): Promise<CostItem | undefined>;
-  getGlobalSettings(): Promise<Settings | undefined>;
-  getUserSettings(userId: string): Promise<Settings | undefined>;
 
   // NEW TURKISH COST ANALYSIS METHODS
   // Turkish Cost Analysis methods
@@ -480,30 +503,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   // AI Analysis methods
-  async getGlobalSettings(): Promise<Settings | undefined> {
+  async createAutoCostAnalysis(analysis: InsertCostAnalysis): Promise<CostAnalysis> {
+    const [newAnalysis] = await db.insert(costAnalyses).values(analysis).returning();
+    return newAnalysis;
+  }
+
+  // Settings methods implementation (safe versions without API key)
+  private omitApiKey(settings: Settings | undefined): SafeSettings | undefined {
+    if (!settings) return undefined;
+    const { n8nApiKey, ...safe } = settings;
+    return safe;
+  }
+
+  async getGlobalSettings(): Promise<SafeSettings | undefined> {
     const result = await db
       .select()
       .from(settings)
       .where(eq(settings.settingsType, "global"))
       .limit(1);
     
-    return result[0];
+    return this.omitApiKey(result[0]);
   }
 
-  async createAutoCostAnalysis(analysis: InsertCostAnalysis): Promise<CostAnalysis> {
-    const [newAnalysis] = await db.insert(costAnalyses).values(analysis).returning();
-    return newAnalysis;
-  }
-
-  // Settings methods implementation
-  async getSettings(userId?: string): Promise<Settings | undefined> {
+  async getSettings(userId?: string): Promise<SafeSettings | undefined> {
     if (userId) {
       return await this.getUserSettings(userId);
     }
     return await this.getGlobalSettings();
   }
 
-  async getUserSettings(userId: string): Promise<Settings | undefined> {
+  async getUserSettings(userId: string): Promise<SafeSettings | undefined> {
     const [userSettings] = await db.select().from(settings)
       .where(and(
         eq(settings.userId, userId),
@@ -516,20 +545,92 @@ export class DatabaseStorage implements IStorage {
       return await this.getGlobalSettings();
     }
     
-    return userSettings;
+    return this.omitApiKey(userSettings);
   }
 
-  async createSettings(settingsData: InsertSettings): Promise<Settings> {
+  async createSettings(settingsData: InsertSettings): Promise<SafeSettings> {
     const [newSettings] = await db.insert(settings).values(settingsData).returning();
-    return newSettings;
+    return this.omitApiKey(newSettings)!;
   }
 
-  async updateSettings(id: string, settingsData: Partial<InsertSettings>): Promise<Settings | undefined> {
+  async updateSettings(id: string, settingsData: Partial<InsertSettings>): Promise<SafeSettings | undefined> {
     const [updatedSettings] = await db.update(settings)
       .set({ ...settingsData, updatedAt: new Date() })
       .where(eq(settings.id, id))
       .returning();
-    return updatedSettings || undefined;
+    return this.omitApiKey(updatedSettings);
+  }
+
+  // WARNING: SERVER-ONLY - DO NOT EXPOSE VIA API
+  // Internal method with API key for server-side agent initialization only
+  async getSettingsWithApiKey(userId?: string): Promise<Settings | undefined> {
+    if (userId) {
+      const [userSettings] = await db.select().from(settings)
+        .where(and(
+          eq(settings.userId, userId),
+          eq(settings.settingsType, "user")
+        ))
+        .limit(1);
+      
+      if (userSettings) return userSettings;
+    }
+    
+    const result = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.settingsType, "global"))
+      .limit(1);
+    
+    return result[0];
+  }
+
+  // Chat Session methods
+  async createChatSession(session: InsertChatSession): Promise<ChatSession> {
+    const [newSession] = await db.insert(chatSessions).values(session).returning();
+    return newSession;
+  }
+
+  async getChatSession(id: string): Promise<ChatSession | undefined> {
+    const [session] = await db.select().from(chatSessions).where(eq(chatSessions.id, id));
+    return session || undefined;
+  }
+
+  async getChatSessionsByUser(userId: string): Promise<ChatSession[]> {
+    return await db.select()
+      .from(chatSessions)
+      .where(eq(chatSessions.userId, userId))
+      .orderBy(desc(chatSessions.updatedAt));
+  }
+
+  async updateChatSession(id: string, session: Partial<InsertChatSession>): Promise<ChatSession | undefined> {
+    const [updated] = await db.update(chatSessions)
+      .set({ ...session, updatedAt: new Date() })
+      .where(eq(chatSessions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteChatSession(id: string): Promise<boolean> {
+    const result = await db.delete(chatSessions).where(eq(chatSessions.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Chat Message methods
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const [newMessage] = await db.insert(chatMessages).values(message).returning();
+    return newMessage;
+  }
+
+  async getChatMessages(sessionId: string): Promise<ChatMessage[]> {
+    return await db.select()
+      .from(chatMessages)
+      .where(eq(chatMessages.sessionId, sessionId))
+      .orderBy(chatMessages.createdAt); // ASC for chronological order
+  }
+
+  async getChatMessage(id: string): Promise<ChatMessage | undefined> {
+    const [message] = await db.select().from(chatMessages).where(eq(chatMessages.id, id));
+    return message || undefined;
   }
 
   // NEW TURKISH COST ANALYSIS IMPLEMENTATION

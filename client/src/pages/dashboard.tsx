@@ -470,9 +470,28 @@ export default function Dashboard() {
       refetchTankOrders();
       refetchOrdersList();
       
-      // Show the uploaded Excel content in a modal
-      if (result.tankOrderId) {
+      // Handle multi-sheet results
+      if (result.results) {
+        const { totalSheets, successfulSheets, failedSheets, tankOrderIds } = result.results;
+        
+        // Show success toast with sheet counts
+        toast({
+          title: "Excel Dosyası Yüklendi",
+          description: `${totalSheets} sayfa işlendi: ${successfulSheets} başarılı${failedSheets > 0 ? `, ${failedSheets} başarısız` : ''}`,
+          variant: failedSheets > 0 ? "default" : "default",
+        });
+        
+        // Open modal for the first successful sheet
+        if (tankOrderIds.length > 0) {
+          await handleViewExcel(tankOrderIds[0]);
+        }
+      } else if (result.tankOrderId) {
+        // Legacy single sheet support
         await handleViewExcel(result.tankOrderId);
+        toast({
+          title: "Başarılı",
+          description: "Excel dosyası yüklendi",
+        });
       }
       
       // Reset file input

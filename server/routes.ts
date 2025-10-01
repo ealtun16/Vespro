@@ -876,192 +876,233 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log the exact file path
       console.log('Excel file saved to:', req.file.path);
 
-      const stats = {
-        rowsProcessed: 0,
-        rowsInserted: 0,
-        rowsSkipped: 0,
-        skippedReasons: [] as string[],
-        dictUpserts: { units: 0, qualities: 0, types: 0 }
-      };
-
       // Read Excel file from disk
       const fileBuffer = fs.readFileSync(req.file.path);
       const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
       
-      // Get the file hash
+      const results = {
+        totalSheets: workbook.SheetNames.length,
+        successfulSheets: 0,
+        failedSheets: 0,
+        tankOrderIds: [] as string[],
+        sheetResults: [] as Array<{
+          sheetName: string;
+          sheetIndex: number;
+          status: 'success' | 'failed';
+          tankOrderId?: string;
+          error?: string;
+        }>
+      };
+
+      // Get the file hash (same for all sheets)
       const fileHash = crypto
         .createHash('sha1')
         .update(fileBuffer)
         .digest('hex');
 
-      // Create sheet upload record with file path
-      const sheetUpload = await storage.createSheetUpload({
-        filename: req.file.originalname,
-        sheet_name: sheetName,
-        file_hash_sha1: fileHash,
-        first_data_row: 8,
-        last_data_row: null,
-        file_path: req.file.filename // Store only filename, not full path
-      });
+      // Process each sheet in the workbook
+      for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex++) {
+        const sheetName = workbook.SheetNames[sheetIndex];
+        const worksheet = workbook.Sheets[sheetName];
 
-      // Parse header data - FINAL CORRECTED mapping
-      // D2=Kod, D3=Müşteri adı, N2=Oluşturma tarihi
-      // I2=Tank çapı, K2=Silindir uzunluğu, P2=Satış fiyatı (Toplam €)
-      // H3=Hacim, I3=Ürün kalitesi, K3=Basınç, P3=Toplam ağırlık (kg)
-      const headerData = {
-        order_code: worksheet['D2']?.v || `ORDER-${Date.now()}`,     // D2: Kod
-        customer_name: worksheet['D3']?.v || '',                     // D3: Müşteri adı
-        project_code: worksheet['H2']?.v || '',
-        diameter_mm: parseNumeric(worksheet['I2']?.v),               // I2: Tank çapı
-        length_mm: parseNumeric(worksheet['K2']?.v),                 // K2: Silindir uzunluğu
-        total_price_eur: parseNumeric(worksheet['P2']?.v),           // P2: Satış fiyatı (Toplam €)
-        created_date: parseExcelDate(worksheet['N2']?.v),            // N2: Oluşturma tarihi
-        temperature_c: parseNumeric(worksheet['R2']?.v),
-        revision_text: worksheet['E3']?.v || '',
-        category_label: worksheet['F3']?.v || '',
-        quantity: parseNumeric(worksheet['H3']?.v),                  // H3: Hacim
-        material_grade: worksheet['I3']?.v || '',                    // I3: Ürün kalitesi
-        pressure_bar: parseNumeric(worksheet['K3']?.v),              // K3: Basınç
-        total_weight_kg: parseNumeric(worksheet['P3']?.v),           // P3: Toplam ağırlık (kg)
-        revision_no: worksheet['P3']?.v || '',
-        pressure_text: null,
-      };
-
-      // Create tank order
-      const tankOrder = await storage.createTankOrder({
-        source_sheet_id: sheetUpload.id,
-        ...headerData
-      });
-
-      // Process cost items starting from row 8 (columns B-T)
-      let row = 8;
-      let lastDataRow = 7;
-      const maxRows = 1000;
-
-      while (row < maxRows) {
-        stats.rowsProcessed++;
-
-        // Read all columns B-T
-        const colB = worksheet[`B${row}`]?.v; // group_no
-        const colC = worksheet[`C${row}`]?.v; // line_no
-        const colD = worksheet[`D${row}`]?.v; // factor_name
-        const colE = worksheet[`E${row}`]?.v; // material_quality
-        const colF = worksheet[`F${row}`]?.v; // material_type
-        const colG = worksheet[`G${row}`]?.v; // dim_g_mm
-        const colH = worksheet[`H${row}`]?.v; // dim_h_mm
-        const colI = worksheet[`I${row}`]?.v; // dim_i_mm_kg
-        const colJ = worksheet[`J${row}`]?.v; // kg_per_m
-        const colK = worksheet[`K${row}`]?.v; // quantity
-        const colL = worksheet[`L${row}`]?.v; // total_qty
-        const colM = worksheet[`M${row}`]?.v; // unit
-        const colN = worksheet[`N${row}`]?.v; // unit_price_eur
-        const colO = worksheet[`O${row}`]?.v; // line_total_eur
-        const colP = worksheet[`P${row}`]?.v; // material_status
-        const colQ = worksheet[`Q${row}`]?.v; // is_atolye_iscilik
-        const colR = worksheet[`R${row}`]?.v; // is_dis_tedarik
-        const colS = worksheet[`S${row}`]?.v; // is_atolye_iscilik_2
-        const colT = worksheet[`T${row}`]?.v; // note
-        
-        // If completely empty row, try next
-        const hasAnyData = [colB, colC, colD, colE, colF, colG, colH, colI, colJ, colK, colL, colM, colN, colO, colP, colQ, colR, colS, colT].some(v => v !== undefined && v !== null && v !== '');
-        
-        if (!hasAnyData) {
-          row++;
-          continue;
-        }
-
-        lastDataRow = row;
-
-        // Check if factor_name exists but all side columns are empty
-        if (colD) {
-          const hasSideData = 
-            colE || colF || 
-            (colG && parseNumeric(colG)) || 
-            (colH && parseNumeric(colH)) || 
-            (colI && parseNumeric(colI)) || 
-            (colJ && parseNumeric(colJ)) || 
-            (colK && parseNumeric(colK)) || 
-            (colL && parseNumeric(colL)) || 
-            colM || 
-            (colN && parseNumeric(colN)) || 
-            (colO && parseNumeric(colO)) || 
-            colP || 
-            colQ || colR || colS || colT;
-
-          if (!hasSideData) {
-            stats.rowsSkipped++;
-            stats.skippedReasons.push(`Row ${row}: factor_name="${colD}" but all side columns empty`);
-            row++;
-            continue;
-          }
-
-          // Upsert dictionary values
-          let unitId = null;
-          let qualityId = null;
-          let typeId = null;
-
-          if (colM && typeof colM === 'string' && colM.trim()) {
-            unitId = await storage.upsertUomUnit(colM.trim());
-            stats.dictUpserts.units++;
-          }
-
-          if (colE && typeof colE === 'string' && colE.trim()) {
-            qualityId = await storage.upsertMaterialQuality(colE.trim());
-            stats.dictUpserts.qualities++;
-          }
-
-          if (colF && typeof colF === 'string' && colF.trim()) {
-            typeId = await storage.upsertMaterialType(colF.trim());
-            stats.dictUpserts.types++;
-          }
-
-          // Build cost item data
-          const costItemData: any = {
-            order_id: tankOrder.id,
-            group_no: parseInteger(colB),
-            line_no: parseInteger(colC),
-            factor_name: String(colD || ''),
-            material_quality_id: qualityId,
-            material_type_id: typeId,
-            dim_g_mm: parseNumeric(colG),
-            dim_h_mm: parseNumeric(colH),
-            dim_i_mm_kg: parseNumeric(colI),
-            kg_per_m: parseNumeric(colJ),
-            quantity: parseNumeric(colK),
-            total_qty: parseNumeric(colL),
-            unit_id: unitId,
-            unit_price_eur: parseNumeric(colN),
-            line_total_eur: parseNumeric(colO),
-            material_status: colP ? String(colP) : null,
-            is_atolye_iscilik: colQ ? Boolean(colQ) : null,
-            is_dis_tedarik: colR ? Boolean(colR) : null,
-            is_atolye_iscilik_2: colS ? Boolean(colS) : null,
-            note: colT ? String(colT) : null,
+        try {
+          const stats = {
+            rowsProcessed: 0,
+            rowsInserted: 0,
+            rowsSkipped: 0,
+            skippedReasons: [] as string[],
+            dictUpserts: { units: 0, qualities: 0, types: 0 }
           };
 
-          await storage.createCostItem(costItemData);
-          stats.rowsInserted++;
-        }
+          // Create sheet upload record with file path
+          const sheetUpload = await storage.createSheetUpload({
+            filename: req.file.originalname,
+            sheet_name: sheetName,
+            file_hash_sha1: fileHash,
+            first_data_row: 8,
+            last_data_row: null,
+            file_path: req.file.filename // Store only filename, not full path
+          });
 
-        row++;
+          // Parse header data - FINAL CORRECTED mapping
+          // D2=Kod, D3=Müşteri adı, N2=Oluşturma tarihi
+          // I2=Tank çapı, K2=Silindir uzunluğu, P2=Satış fiyatı (Toplam €)
+          // H3=Hacim, I3=Ürün kalitesi, K3=Basınç, P3=Toplam ağırlık (kg)
+          const headerData = {
+            order_code: worksheet['D2']?.v || `${sheetName}-${Date.now()}`,  // D2: Kod, unique per sheet
+            customer_name: worksheet['D3']?.v || '',                     // D3: Müşteri adı
+            project_code: worksheet['H2']?.v || '',
+            diameter_mm: parseNumeric(worksheet['I2']?.v),               // I2: Tank çapı
+            length_mm: parseNumeric(worksheet['K2']?.v),                 // K2: Silindir uzunluğu
+            total_price_eur: parseNumeric(worksheet['P2']?.v),           // P2: Satış fiyatı (Toplam €)
+            created_date: parseExcelDate(worksheet['N2']?.v),            // N2: Oluşturma tarihi
+            temperature_c: parseNumeric(worksheet['R2']?.v),
+            revision_text: worksheet['E3']?.v || '',
+            category_label: worksheet['F3']?.v || '',
+            volume: parseNumeric(worksheet['H3']?.v),                    // H3: Hacim
+            material_grade: worksheet['I3']?.v || '',                    // I3: Ürün kalitesi
+            pressure_bar: parseNumeric(worksheet['K3']?.v),              // K3: Basınç
+            total_weight_kg: parseNumeric(worksheet['P3']?.v),           // P3: Toplam ağırlık (kg)
+            revision_no: worksheet['P3']?.v || '',
+            pressure_text: null,
+          };
+
+          // Create tank order with sheet tracking
+          const tankOrder = await storage.createTankOrder({
+            source_sheet_id: sheetUpload.id,
+            sheet_name: sheetName,
+            sheet_index: sheetIndex,
+            source_kind: 'Excel',
+            source_filename: req.file.originalname,
+            ...headerData
+          });
+
+          // Process cost items starting from row 8 (columns B-T)
+          let row = 8;
+          let lastDataRow = 7;
+          const maxRows = 1000;
+
+          while (row < maxRows) {
+            stats.rowsProcessed++;
+
+            // Read all columns B-T
+            const colB = worksheet[`B${row}`]?.v; // group_no
+            const colC = worksheet[`C${row}`]?.v; // line_no
+            const colD = worksheet[`D${row}`]?.v; // factor_name
+            const colE = worksheet[`E${row}`]?.v; // material_quality
+            const colF = worksheet[`F${row}`]?.v; // material_type
+            const colG = worksheet[`G${row}`]?.v; // dim_g_mm
+            const colH = worksheet[`H${row}`]?.v; // dim_h_mm
+            const colI = worksheet[`I${row}`]?.v; // dim_i_mm_kg
+            const colJ = worksheet[`J${row}`]?.v; // kg_per_m
+            const colK = worksheet[`K${row}`]?.v; // quantity
+            const colL = worksheet[`L${row}`]?.v; // total_qty
+            const colM = worksheet[`M${row}`]?.v; // unit
+            const colN = worksheet[`N${row}`]?.v; // unit_price_eur
+            const colO = worksheet[`O${row}`]?.v; // line_total_eur
+            const colP = worksheet[`P${row}`]?.v; // material_status
+            const colQ = worksheet[`Q${row}`]?.v; // is_atolye_iscilik
+            const colR = worksheet[`R${row}`]?.v; // is_dis_tedarik
+            const colS = worksheet[`S${row}`]?.v; // is_atolye_iscilik_2
+            const colT = worksheet[`T${row}`]?.v; // note
+            
+            // If completely empty row, try next
+            const hasAnyData = [colB, colC, colD, colE, colF, colG, colH, colI, colJ, colK, colL, colM, colN, colO, colP, colQ, colR, colS, colT].some(v => v !== undefined && v !== null && v !== '');
+            
+            if (!hasAnyData) {
+              row++;
+              continue;
+            }
+
+            lastDataRow = row;
+
+            // Check if factor_name exists but all side columns are empty
+            if (colD) {
+              const hasSideData = 
+                colE || colF || 
+                (colG && parseNumeric(colG)) || 
+                (colH && parseNumeric(colH)) || 
+                (colI && parseNumeric(colI)) || 
+                (colJ && parseNumeric(colJ)) || 
+                (colK && parseNumeric(colK)) || 
+                (colL && parseNumeric(colL)) || 
+                colM || 
+                (colN && parseNumeric(colN)) || 
+                (colO && parseNumeric(colO)) || 
+                colP || 
+                colQ || colR || colS || colT;
+
+              if (!hasSideData) {
+                stats.rowsSkipped++;
+                stats.skippedReasons.push(`Row ${row}: factor_name="${colD}" but all side columns empty`);
+                row++;
+                continue;
+              }
+
+              // Upsert dictionary values
+              let unitId = null;
+              let qualityId = null;
+              let typeId = null;
+
+              if (colM && typeof colM === 'string' && colM.trim()) {
+                unitId = await storage.upsertUomUnit(colM.trim());
+                stats.dictUpserts.units++;
+              }
+
+              if (colE && typeof colE === 'string' && colE.trim()) {
+                qualityId = await storage.upsertMaterialQuality(colE.trim());
+                stats.dictUpserts.qualities++;
+              }
+
+              if (colF && typeof colF === 'string' && colF.trim()) {
+                typeId = await storage.upsertMaterialType(colF.trim());
+                stats.dictUpserts.types++;
+              }
+
+              // Build cost item data
+              const costItemData: any = {
+                order_id: tankOrder.id,
+                group_no: parseInteger(colB),
+                line_no: parseInteger(colC),
+                factor_name: String(colD || ''),
+                material_quality_id: qualityId,
+                material_type_id: typeId,
+                dim_g_mm: parseNumeric(colG),
+                dim_h_mm: parseNumeric(colH),
+                dim_i_mm_kg: parseNumeric(colI),
+                kg_per_m: parseNumeric(colJ),
+                quantity: parseNumeric(colK),
+                total_qty: parseNumeric(colL),
+                unit_id: unitId,
+                unit_price_eur: parseNumeric(colN),
+                line_total_eur: parseNumeric(colO),
+                material_status: colP ? String(colP) : null,
+                is_atolye_iscilik: colQ ? Boolean(colQ) : null,
+                is_dis_tedarik: colR ? Boolean(colR) : null,
+                is_atolye_iscilik_2: colS ? Boolean(colS) : null,
+                note: colT ? String(colT) : null,
+              };
+
+              await storage.createCostItem(costItemData);
+              stats.rowsInserted++;
+            }
+
+            row++;
+          }
+
+          // Update sheet upload with last data row
+          await storage.updateSheetUpload(String(sheetUpload.id), {
+            last_data_row: lastDataRow
+          });
+
+          // Track success
+          results.successfulSheets++;
+          results.tankOrderIds.push(String(tankOrder.id));
+          results.sheetResults.push({
+            sheetName,
+            sheetIndex,
+            status: 'success',
+            tankOrderId: String(tankOrder.id)
+          });
+
+        } catch (sheetError) {
+          // Track failure
+          results.failedSheets++;
+          results.sheetResults.push({
+            sheetName,
+            sheetIndex,
+            status: 'failed',
+            error: sheetError instanceof Error ? sheetError.message : 'Unknown error'
+          });
+          console.error(`Error processing sheet "${sheetName}":`, sheetError);
+        }
       }
 
-      // Update sheet upload with last data row
-      await storage.updateSheetUpload(String(sheetUpload.id), {
-        last_data_row: lastDataRow
-      });
-
+      // Return summary of all sheets
       res.json({
         success: true,
-        message: "Excel file processed successfully",
-        tankOrderId: String(tankOrder.id),
-        sheetUploadId: String(sheetUpload.id),
-        stats: {
-          ...stats,
-          lastDataRow
-        }
+        message: `Processed ${results.totalSheets} sheet(s): ${results.successfulSheets} successful, ${results.failedSheets} failed`,
+        results
       });
 
     } catch (error) {

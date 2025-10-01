@@ -460,6 +460,11 @@ export const tankOrder = pgTable("tank_order", {
   id: bigserial("id", { mode: "bigint" }).primaryKey(),
   source_sheet_id: bigint("source_sheet_id", { mode: "bigint" }).references(() => sheetUpload.id, { onDelete: "set null" }),
   
+  sheet_name: text("sheet_name"),
+  sheet_index: integer("sheet_index"),
+  source_kind: text("source_kind").default("Manual"),
+  source_filename: text("source_filename"),
+  
   order_code: text("order_code").unique(),
   customer_name: text("customer_name"),
   project_code: text("project_code"),
@@ -471,6 +476,10 @@ export const tankOrder = pgTable("tank_order", {
   pressure_text: text("pressure_text"),
   pressure_bar: numeric("pressure_bar", { precision: 10, scale: 3 }),
   
+  volume: numeric("volume", { precision: 12, scale: 3 }),
+  labor_eur: numeric("labor_eur", { precision: 14, scale: 2 }),
+  outsource_eur: numeric("outsource_eur", { precision: 14, scale: 2 }),
+  
   total_weight_kg: numeric("total_weight_kg", { precision: 14, scale: 3 }),
   total_price_eur: numeric("total_price_eur", { precision: 14, scale: 2 }),
   created_date: date("created_date"),
@@ -481,6 +490,9 @@ export const tankOrder = pgTable("tank_order", {
   temperature_c: numeric("temperature_c", { precision: 8, scale: 2 }),
   
   extra_head_json: jsonb("extra_head_json"),
+  
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // Tank order header raw data
@@ -561,6 +573,8 @@ export const laborLog = pgTable("labor_log", {
 // Insert schemas for new tables
 export const insertTankOrderSchema = createInsertSchema(tankOrder).omit({
   id: true,
+  created_at: true,
+  updated_at: true,
 });
 
 export const insertCostItemSchema = createInsertSchema(costItem).omit({

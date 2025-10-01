@@ -106,6 +106,11 @@ export interface IStorage {
   getSheetUpload(id: string): Promise<SheetUpload | undefined>;
   updateSheetUpload(id: string, upload: Partial<InsertSheetUpload>): Promise<SheetUpload | undefined>;
   createTankOrder(order: InsertTankOrder): Promise<TankOrder>;
+  createTankOrders(orders: InsertTankOrder[]): Promise<TankOrder[]>;
+  getAllTankOrders(): Promise<TankOrder[]>;
+  getTankOrder(id: string): Promise<TankOrder | undefined>;
+  getTankOrderWithItems(id: string): Promise<{ order: TankOrder; items: CostItem[] } | null>;
+  deleteTankOrder(id: string): Promise<boolean>;
   updateTankOrder(id: string, order: Partial<InsertTankOrder>): Promise<TankOrder | undefined>;
   createCostItem(item: InsertCostItem): Promise<CostItem>;
   updateCostItem(id: string, item: Partial<InsertCostItem>): Promise<CostItem | undefined>;
@@ -663,6 +668,22 @@ export class DatabaseStorage implements IStorage {
     return newOrder;
   }
 
+  async createTankOrders(orders: InsertTankOrder[]): Promise<TankOrder[]> {
+    if (orders.length === 0) return [];
+    const newOrders = await db.insert(tankOrder).values(orders).returning();
+    return newOrders;
+  }
+
+  async getTankOrder(id: string): Promise<TankOrder | undefined> {
+    const [order] = await db.select().from(tankOrder).where(eq(tankOrder.id, BigInt(id)));
+    return order || undefined;
+  }
+
+  async deleteTankOrder(id: string): Promise<boolean> {
+    const result = await db.delete(tankOrder).where(eq(tankOrder.id, BigInt(id)));
+    return (result.rowCount || 0) > 0;
+  }
+
   async updateTankOrder(id: string, order: Partial<InsertTankOrder>): Promise<TankOrder | undefined> {
     const [updated] = await db
       .update(tankOrder)
@@ -732,11 +753,6 @@ export class DatabaseStorage implements IStorage {
       RETURNING id
     `);
     return (result.rows[0] as any).id;
-  }
-
-  async deleteTankOrder(id: string): Promise<boolean> {
-    const result = await db.delete(tankOrder).where(eq(tankOrder.id, BigInt(id)));
-    return (result.rowCount || 0) > 0;
   }
 
   async getOrdersList(): Promise<any[]> {

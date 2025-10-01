@@ -1139,8 +1139,7 @@ export default function Dashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Kod</TableHead>
-                  <TableHead>Müşteri / Proje</TableHead>
+                  <TableHead>Ürün Kodu</TableHead>
                   <TableHead>Tank Ölçüleri</TableHead>
                   <TableHead>Malzeme Kalitesi</TableHead>
                   <TableHead className="text-right">Toplam Malzeme Kg</TableHead>
@@ -1165,16 +1164,6 @@ export default function Dashboard() {
                     <TableRow key={order.id}>
                       <TableCell data-testid={`text-kod-${order.id}`} className="font-medium">
                         {order.kod || '-'}
-                      </TableCell>
-                      <TableCell data-testid={`text-customer-${order.id}`}>
-                        <div className="flex flex-col">
-                          <span>{order.customer_name || '-'}</span>
-                          {order.project_code && (
-                            <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 mt-1 w-fit">
-                              {order.project_code}
-                            </span>
-                          )}
-                        </div>
                       </TableCell>
                       <TableCell data-testid={`text-tank-dimensions-${order.id}`}>
                         {tankDimensions || '-'}
@@ -1236,7 +1225,7 @@ export default function Dashboard() {
                 {/* Empty State */}
                 {(!(ordersListData as any)?.orders || (ordersListData as any).orders.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       Henüz maliyet analizi bulunamadı. Manuel form oluşturmak veya Excel dosyası yüklemek için yukarıdaki butonları kullanın.
                     </TableCell>
                   </TableRow>

@@ -187,6 +187,7 @@ export function ExcelViewerModal({ isOpen, onClose, data, isLoading }: ExcelView
                     <CardTitle className="font-bold">Maliyet Kalemleri</CardTitle>
                     <Button
                       variant="outline"
+                      
                       size="sm"
                       onClick={toggleFilterMode}
                       className="flex items-center gap-1"

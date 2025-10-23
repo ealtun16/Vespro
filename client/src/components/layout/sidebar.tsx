@@ -20,7 +20,6 @@ export default function Sidebar() {
     { href: "/tank-analysis", label: t('nav.tankAnalysis'), icon: Factory },
     { href: "/chat", label: t('nav.chat'), icon: MessageSquare },
     { href: "/reports", label: t('nav.reports'), icon: FileSpreadsheet },
-    { href: "/settings", label: t('nav.settings'), icon: Settings },
   ];
 
   return (

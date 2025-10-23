@@ -9,17 +9,55 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/lib/i18n";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Settings2, Globe, DollarSign, Calculator, Bot } from "lucide-react";
+import { Settings2, Globe, DollarSign, Calculator, Bot, RefreshCw } from "lucide-react";
 import type { Settings } from "@shared/schema";
+import { useState } from "react";
 
 export default function SettingsPage() {
   const { t, setLanguage } = useTranslation();
   const { toast } = useToast();
+  const [isUpdatingRates, setIsUpdatingRates] = useState(false);
   
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading, error, isError } = useQuery<Settings>({
     queryKey: ['/api/settings'],
-    select: (data: Settings) => data
+    retry: 3,
+    retryDelay: 1000,
   });
+
+  console.log('[Settings] Query state:', { 
+    isLoading, 
+    isError, 
+    hasData: !!settings,
+    error: error?.message 
+  });
+
+  const updateExchangeRatesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/exchange-rates/update-settings', {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings'] });
+      toast({
+        title: 'Kurlar Güncellendi',
+        description: `EUR/USD: ${data.rates.eurToUsd.toFixed(4)}, USD/TRY: ${data.rates.usdToTry.toFixed(4)}`,
+      });
+      setIsUpdatingRates(false);
+    },
+    onError: () => {
+      toast({
+        title: 'Hata',
+        description: 'Kurlar güncellenirken bir hata oluştu',
+        variant: "destructive",
+      });
+      setIsUpdatingRates(false);
+    }
+  });
+
+  const handleUpdateExchangeRates = () => {
+    setIsUpdatingRates(true);
+    updateExchangeRatesMutation.mutate();
+  };
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (updatedSettings: Partial<Settings>) => {
@@ -151,9 +189,29 @@ export default function SettingsPage() {
           
           <Separator />
           
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h4 className="text-sm font-medium">Döviz Kurları</h4>
+              <p className="text-xs text-muted-foreground">
+                {settings.lastRateUpdate 
+                  ? `Son güncelleme: ${new Date(settings.lastRateUpdate).toLocaleString('tr-TR')}`
+                  : 'Henüz güncellenmedi'}
+              </p>
+            </div>
+            <Button 
+              onClick={handleUpdateExchangeRates}
+              disabled={isUpdatingRates}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isUpdatingRates ? 'animate-spin' : ''}`} />
+              Kurları Güncelle
+            </Button>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="eurRate">{t('settings.currency.eurRate')}</Label>
+              <Label htmlFor="eurRate">EUR/USD Kuru</Label>
               <Input
                 id="eurRate"
                 type="number"
@@ -161,18 +219,24 @@ export default function SettingsPage() {
                 value={settings.eurToUsdRate || ''}
                 onChange={(e) => handleUpdateSettings('eurToUsdRate', e.target.value)}
                 data-testid="input-eur-rate"
+                disabled
+                className="bg-muted"
               />
+              <p className="text-xs text-muted-foreground">Otomatik olarak güncellenir</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tryRate">{t('settings.currency.tryRate')}</Label>
+              <Label htmlFor="tryRate">USD/TRY Kuru</Label>
               <Input
                 id="tryRate"
                 type="number"
                 step="0.0001"
-                value={settings.tryToUsdRate || ''}
-                onChange={(e) => handleUpdateSettings('tryToUsdRate', e.target.value)}
+                value={settings.usdToTryRate || ''}
+                onChange={(e) => handleUpdateSettings('usdToTryRate', e.target.value)}
                 data-testid="input-try-rate"
+                disabled
+                className="bg-muted"
               />
+              <p className="text-xs text-muted-foreground">Avrupa Merkez Bankası verisi</p>
             </div>
           </div>
         </CardContent>

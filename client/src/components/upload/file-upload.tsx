@@ -41,12 +41,15 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
           const formData = new FormData();
           formData.append('file', file);
 
-          const response = await apiRequest('POST', '/api/import/excel', formData);
+          const response = await apiRequest('POST', '/api/excel/upload', formData);
+          const data = await response.json();
           
-          if (response.ok) {
+          // Check both HTTP status and response body success field
+          if (response.ok && data.success !== false) {
             successCount++;
           } else {
             errorCount++;
+            console.error(`Upload failed for ${file.name}:`, data.message || data.error);
           }
         } catch (error) {
           console.error(`Error uploading ${file.name}:`, error);

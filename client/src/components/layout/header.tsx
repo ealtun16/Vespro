@@ -9,9 +9,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
 import { useTranslation } from "@/lib/i18n";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function Header() {
   const { t } = useTranslation();
+  const { user, logout } = useAuth();
+  
+  const handleLogout = async () => {
+    await logout();
+  };
+  
+  // Get user initials
+  const getUserInitials = () => {
+    if (!user?.username) return 'U';
+    return user.username.substring(0, 2).toUpperCase();
+  };
+  
   return (
     <header className="bg-card border-b border-border card-shadow">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -30,9 +43,13 @@ export default function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2 p-2" data-testid="button-user-menu">
                   <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                    <span className="text-primary-foreground text-sm font-medium" data-testid="text-user-initials">JD</span>
+                    <span className="text-primary-foreground text-sm font-medium" data-testid="text-user-initials">
+                      {getUserInitials()}
+                    </span>
                   </div>
-                  <span className="text-sm font-medium text-foreground" data-testid="text-username">John Doe</span>
+                  <span className="text-sm font-medium text-foreground" data-testid="text-username">
+                    {user?.username || 'User'}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48" data-testid="dropdown-user-menu">
@@ -43,7 +60,11 @@ export default function Header() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="flex items-center cursor-pointer text-red-600" data-testid="button-logout">
+                <DropdownMenuItem 
+                  onClick={handleLogout}
+                  className="flex items-center cursor-pointer text-red-600" 
+                  data-testid="button-logout"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   {t('action.logout')}
                 </DropdownMenuItem>

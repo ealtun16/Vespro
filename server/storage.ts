@@ -857,11 +857,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOrdersList(): Promise<any[]> {
-    const result = await db.execute(sql`
-      SELECT * FROM orders_list_view 
-      ORDER BY total_price_eur DESC NULLS LAST, updated_at DESC
-    `);
-    return result.rows as any[];
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM orders_list_view 
+        ORDER BY total_price_eur DESC NULLS LAST, updated_at DESC
+      `);
+      return result.rows as any[];
+    } catch (error) {
+      console.error('Error in getOrdersList:', error);
+      // Fallback to direct tank_order query if view fails
+      try {
+        const orders = await db.select().from(tankOrder).orderBy(desc(tankOrder.updated_at));
+        return orders as any[];
+      } catch (fallbackError) {
+        console.error('Fallback query also failed:', fallbackError);
+        return [];
+      }
+    }
   }
 }
 

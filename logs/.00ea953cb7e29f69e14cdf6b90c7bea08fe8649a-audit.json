@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\Users\\ebrar\\OneDrive\\Belgeler\\Vespro\\Vespro\\logs\\.00ea953cb7e29f69e14cdf6b90c7bea08fe8649a-audit.json",
+    "files": [
+        {
+            "date": 1761226718665,
+            "name": "C:\\Users\\ebrar\\OneDrive\\Belgeler\\Vespro\\Vespro\\logs\\combined-2025-10-23.log",
+            "hash": "5b462cedd31142d744736eece2252b51e749d139b249c7d0ebace8f3196030ce"
+        }
+    ],
+    "hashType": "sha256"
+}

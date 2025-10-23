@@ -45,6 +45,7 @@ import {
   FileText,
   Upload,
 } from "lucide-react";
+import { ExcelViewerModal } from "@/components/excel-viewer-modal";
 import { Edit } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -288,7 +289,8 @@ export default function Dashboard() {
 
   const deleteTankOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      return await apiRequest("DELETE", `/api/tank-orders/${orderId}`);
+      // Yeni tank-forms endpoint'ini kullan (Excel dosyasını da siler)
+      return await apiRequest("DELETE", `/api/tank-forms/${orderId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tank-orders"] });
@@ -299,10 +301,10 @@ export default function Dashboard() {
       setDeleteOrderId(null);
       toast({
         title: "Başarılı",
-        description: "Form başarıyla silindi",
+        description: "Form ve Excel dosyası başarıyla silindi",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       console.error("Tank order delete error:", error);
       toast({
         title: "Hata",
@@ -409,37 +411,38 @@ export default function Dashboard() {
   };
 
   const handleViewExcel = async (orderId: string) => {
+    console.log('[handleViewExcel] Attempting to view order with ID:', orderId, 'Type:', typeof orderId);
     setExcelLoading(true);
     setExcelViewOpen(true);
     setExcelViewData(null);
     try {
-      const response = await fetch(`/api/tank-orders/${orderId}/excel`);
+      const response = await fetch(`/api/tank-forms/${orderId}`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Excel dosyası yüklenemedi:', {
+        console.error('[handleViewExcel] Tank formu yüklenemedi:', {
           orderId,
           status: response.status,
-          message: errorData.message
+          statusText: response.statusText,
+          errorData
         });
-        throw new Error(errorData.message || 'Excel dosyası yüklenemedi');
+        throw new Error(errorData.error || errorData.message || 'Tank formu yüklenemedi');
       }
       
       const data = await response.json();
       
-      // Log the file path for debugging
-      console.log('Excel dosyası yüklendi:', {
-        filename: data.filename,
-        filePath: data.filePath,
+      console.log('[handleViewExcel] Tank formu başarıyla yüklendi:', {
+        tank_kodu: data.tank_kodu,
+        id: data.id,
         orderId
       });
       
       setExcelViewData(data);
     } catch (error) {
-      console.error('Excel görüntüleme hatası:', error);
+      console.error('[handleViewExcel] Tank form görüntüleme hatası:', error);
       setExcelViewData({ 
         error: true, 
-        message: error instanceof Error ? error.message : 'Excel dosyası bulunamadı veya yol hatalı' 
+        message: error instanceof Error ? error.message : 'Tank formu bulunamadı' 
       });
     } finally {
       setExcelLoading(false);
@@ -1128,20 +1131,44 @@ export default function Dashboard() {
                   <TableHead className="text-right">Toplam Malzeme Kg</TableHead>
                   <TableHead className="text-right">Satış Fiyatı €</TableHead>
                   <TableHead>Kaynak</TableHead>
-                  <TableHead>Oluşturma / Güncelleme</TableHead>
+                  <TableHead>Oluşturulma</TableHead>
                   <TableHead>İşlemler</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(ordersListData as any)?.orders?.map((order: any) => {
+                        {(ordersListData as any)?.orders?.map((order: any) => {
                   const tankDimensions = [
                     order.diameter_mm ? `Ø${parseFloat(order.diameter_mm).toFixed(0)}` : null,
                     order.length_mm ? `${parseFloat(order.length_mm).toFixed(0)}mm` : null,
                     order.pressure_bar ? `${parseFloat(order.pressure_bar).toFixed(1)} bar` : null,
                   ].filter(Boolean).join(' × ');
 
-                  const createdDate = order.created_date ? new Date(order.created_date).toLocaleDateString('tr-TR') : '-';
-                  const updatedAt = order.updated_at ? new Date(order.updated_at).toLocaleDateString('tr-TR') : '-';
+                  // Format sadece tarihi (saat yok) - UTC sorununu önlemek için direkt string parse
+                  const formatDateOnly = (dateStr: any) => {
+                    if (!dateStr) return '-';
+                    try {
+                      const str = String(dateStr).trim();
+                      // PostgreSQL timestamp: "2023-11-15 12:34:56.789+00" veya ISO: "2023-11-15T12:34:56" veya "2023-11-15"
+                      let datePart = str;
+                      if (str.includes('T')) {
+                        datePart = str.split('T')[0];
+                      } else if (str.includes(' ')) {
+                        datePart = str.split(' ')[0];
+                      }
+                      
+                      // Validate date format YYYY-MM-DD
+                      if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+                        return '-';
+                      }
+                      
+                      const [year, month, day] = datePart.split('-');
+                      return `${day}.${month}.${year}`;
+                    } catch {
+                      return '-';
+                    }
+                  };
+
+                  const createdDate = formatDateOnly(order.created_date);
 
                   return (
                     <TableRow key={order.id}>
@@ -1173,9 +1200,8 @@ export default function Dashboard() {
                         </span>
                       </TableCell>
                       <TableCell data-testid={`text-dates-${order.id}`}>
-                        <div className="flex flex-col text-sm">
-                          <span>{createdDate}</span>
-                          <span className="text-xs text-muted-foreground">{updatedAt}</span>
+                        <div className="text-sm">
+                          {createdDate}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1183,7 +1209,10 @@ export default function Dashboard() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleViewExcel(order.id)}
+                            onClick={() => {
+                              console.log('[Button Click] View order:', { id: order.id, kod: order.kod });
+                              handleViewExcel(String(order.id));
+                            }}
                             data-testid={`button-view-${order.id}`}
                           >
                             <Eye className="h-4 w-4" />
@@ -1192,7 +1221,8 @@ export default function Dashboard() {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setDeleteOrderId(order.id);
+                              console.log('[Button Click] Delete order:', { id: order.id, kod: order.kod });
+                              setDeleteOrderId(String(order.id));
                               setDeleteDialogOpen(true);
                             }}
                             data-testid={`button-delete-${order.id}`}
@@ -1389,116 +1419,12 @@ export default function Dashboard() {
       </AlertDialog>
 
       {/* Excel View Modal */}
-      {excelViewOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setExcelViewOpen(false)}
-          />
-          
-          <div className="relative z-10 bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-[95vw] h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">
-                {excelViewData?.filename || 'Excel Dosyası'}
-              </h2>
-              <div className="flex items-center gap-2">
-                {excelViewData?.filename && (
-                  <Button
-                    onClick={() => {
-                      try {
-                        const a = document.createElement('a');
-                        a.href = `/download/${excelViewData.filename}`;
-                        a.download = excelViewData.filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        
-                        toast({
-                          title: "Başarılı",
-                          description: "Excel dosyası indirildi",
-                        });
-                      } catch (error) {
-                        console.error('İndirme hatası:', error);
-                        toast({
-                          title: "Hata",
-                          description: "Excel dosyası indirilemedi",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                    variant="outline"
-                    size="sm"
-                    data-testid="button-download-excel"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    İndir
-                  </Button>
-                )}
-                <Button
-                  onClick={() => setExcelViewOpen(false)}
-                  variant="ghost"
-                  size="sm"
-                  data-testid="button-close-excel"
-                >
-                  ✕
-                </Button>
-              </div>
-            </div>
-            
-            <div className="flex-1 overflow-auto p-4">
-              {excelLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-muted-foreground">Yükleniyor...</div>
-                </div>
-              ) : excelViewData?.error ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <div className="text-destructive text-lg font-semibold mb-2">
-                      Dosya Bulunamadı
-                    </div>
-                    <div className="text-muted-foreground">
-                      {excelViewData.message || 'Excel dosyası bulunamadı veya yol hatalı'}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-4">
-                      Lütfen dosyanın yüklendiğinden emin olun veya tekrar deneyin.
-                    </div>
-                  </div>
-                </div>
-              ) : excelViewData?.html ? (
-                <div 
-                  dangerouslySetInnerHTML={{ __html: excelViewData.html }}
-                  className="excel-table"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-muted-foreground">Excel verisi bulunamadı</div>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <style>{`
-            .excel-table table {
-              border-collapse: collapse;
-              width: 100%;
-              font-family: Arial, sans-serif;
-              font-size: 12px;
-            }
-            .excel-table td, .excel-table th {
-              border: 1px solid #ddd;
-              padding: 8px 12px;
-              text-align: left;
-              white-space: nowrap;
-            }
-            .excel-table tr:nth-child(even) {
-              background-color: #f9f9f9;
-            }
-            .excel-table tr:hover {
-              background-color: #f0f0f0;
-            }
-          `}</style>
-        </div>
-      )}
+      <ExcelViewerModal
+        isOpen={excelViewOpen}
+        onClose={() => setExcelViewOpen(false)}
+        data={excelViewData}
+        isLoading={excelLoading}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { Express, Request } from "express";
+import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -6,10 +6,14 @@ import { insertCostAnalysisSchema, insertTankSpecificationSchema, insertMaterial
 import * as XLSX from "xlsx";
 import { CostAnalysisEngine } from "./cost-analysis-engine";
 import multer from "multer";
-import crypto from "crypto";
 import path from "path";
 import fs from "fs";
 import { z } from "zod";
+import { ExchangeRateService } from "./exchange-rate-service";
+import bcrypt from "bcryptjs";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
+import logger, { logExcelUpload, logApiError, logDbError } from "./logger";
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -56,6 +60,102 @@ const agentAnalyzeSchema = z.object({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // ========================================
+  // TANK FORMS API (New Excel Viewer)
+  // ========================================
+  const { registerTankApi } = await import('./tank-api');
+  registerTankApi(app);
+
+  // ========================================
+  // AUTHENTICATION ROUTES
+  // ========================================
+  
+  // Register
+  app.post('/api/auth/register', async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
+      }
+      
+      if (password.length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters' });
+      }
+      
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(409).json({ message: 'Username already exists' });
+      }
+      
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({ username, password: hashedPassword });
+      req.session.userId = user.id;
+      
+      res.status(201).json({ user: { id: user.id, username: user.username } });
+    } catch (error) {
+      console.error('Registration error:', error);
+      res.status(500).json({ message: 'Registration failed' });
+    }
+  });
+  
+  // Login
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
+      }
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid username or password' });
+      }
+      
+      const isValid = await bcrypt.compare(password, user.password);
+      if (!isValid) {
+        return res.status(401).json({ message: 'Invalid username or password' });
+      }
+      
+      req.session.userId = user.id;
+      res.json({ user: { id: user.id, username: user.username } });
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ message: 'Login failed' });
+    }
+  });
+  
+  // Get current user
+  app.get('/api/auth/me', async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+      
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      res.json({ id: user.id, username: user.username });
+    } catch (error) {
+      console.error('Get current user error:', error);
+      res.status(500).json({ message: 'Failed to get user' });
+    }
+  });
+  
+  // Logout
+  app.post('/api/auth/logout', async (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Logout error:', err);
+        return res.status(500).json({ message: 'Logout failed' });
+      }
+      res.json({ message: 'Logged out successfully' });
+    });
+  });
+
   // Serve uploaded files - use express.static for secure file serving
   app.use('/uploads', express.static(uploadsDir, { 
     index: false,
@@ -295,6 +395,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error exporting Excel file:", error);
       res.status(500).json({ message: "Failed to export Excel file" });
+    }
+  });
+
+  // ========================================
+  // EXCHANGE RATE ENDPOINTS
+  // ========================================
+  
+  // Fetch latest exchange rates from external API
+  app.get('/api/exchange-rates/latest', async (req, res) => {
+    try {
+      const rates = await ExchangeRateService.fetchLatestRates();
+      const eurToUsdRate = ExchangeRateService.calculateEurToUsd(rates.usdToEur);
+      
+      res.json({
+        success: true,
+        rates: {
+          usdToEur: rates.usdToEur,
+          eurToUsd: eurToUsdRate,
+          usdToTry: rates.usdToTry,
+        },
+        lastUpdated: rates.lastUpdated,
+        source: 'European Central Bank (via Frankfurter API)'
+      });
+    } catch (error) {
+      console.error('Error fetching exchange rates:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch exchange rates from external source' });
+    }
+  });
+
+  // Update settings with latest exchange rates
+  app.post('/api/exchange-rates/update-settings', async (req, res) => {
+    try {
+      const settings = await storage.getGlobalSettings();
+      if (!settings) {
+        return res.status(404).json({ success: false, error: 'Settings not found. Please create settings first.' });
+      }
+
+      const rates = await ExchangeRateService.fetchLatestRates();
+      const eurToUsdRate = ExchangeRateService.calculateEurToUsd(rates.usdToEur);
+      
+      if (!ExchangeRateService.isValidRate(rates.usdToEur) || !ExchangeRateService.isValidRate(rates.usdToTry)) {
+        return res.status(500).json({ success: false, error: 'Received invalid exchange rates from external API' });
+      }
+
+      const updatedSettings = await storage.updateSettings(settings.id, {
+        eurToUsdRate: eurToUsdRate.toFixed(4),
+        usdToTryRate: rates.usdToTry.toFixed(4),
+        lastRateUpdate: new Date()
+      } as any);
+
+      res.json({
+        success: true,
+        message: 'Exchange rates updated successfully',
+        rates: { eurToUsd: eurToUsdRate, usdToTry: rates.usdToTry },
+        lastUpdated: rates.lastUpdated,
+        settings: updatedSettings
+      });
+    } catch (error) {
+      console.error('Error updating exchange rates in settings:', error);
+      res.status(500).json({ success: false, error: 'Failed to update exchange rates in settings' });
     }
   });
 
@@ -951,339 +1111,227 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // EXCEL UPLOAD ROUTE 
+  // EXCEL UPLOAD ROUTE (NEW SYSTEM - uses tank table)
   // ========================================
   
-  // Helper function to safely parse numeric values from Excel
-  const parseNumeric = (value: any): string | null => {
-    if (value === null || value === undefined || value === '') {
-      return null;
-    }
-    
-    // If it's already a number, convert to string
-    if (typeof value === 'number') {
-      return String(value);
-    }
-    
-    // If it's a string, try to extract numeric value
-    if (typeof value === 'string') {
-      // Remove common units and text
-      const cleaned = value.replace(/[^\d.,-]/g, '').trim();
-      if (cleaned === '') {
-        return null;
-      }
-      
-      // Check if it's a valid number
-      const num = parseFloat(cleaned);
-      if (!isNaN(num)) {
-        return String(num);
-      }
-    }
-    
-    return null;
-  };
+  // Helper: Extract number from text (e.g., "0 BAR" -> 0, "2250 mm" -> 2250)
+  function extractNumber(val: any): number | null {
+    if (val === null || val === undefined || val === '') return null;
+    if (typeof val === 'number') return val;
+    const str = String(val).replace(/,/g, '.');
+    const match = str.match(/-?\d+\.?\d*/);
+    return match ? parseFloat(match[0]) : null;
+  }
 
-  // Helper function to safely parse integer values from Excel
-  const parseInteger = (value: any): number | null => {
-    if (value === null || value === undefined || value === '') {
-      return null;
-    }
-    
-    // If it's already a number, round to integer
-    if (typeof value === 'number') {
-      return Math.round(value);
-    }
-    
-    // If it's a string, try to extract integer value
-    if (typeof value === 'string') {
-      // Remove all non-numeric characters
-      const cleaned = value.replace(/[^\d]/g, '').trim();
-      if (cleaned === '') {
-        return null;
-      }
-      
-      const num = parseInt(cleaned, 10);
-      if (!isNaN(num)) {
-        return num;
-      }
-    }
-    
-    return null;
-  };
-
-  // Helper function to parse Excel date values
-  const parseExcelDate = (value: any): string | null => {
-    if (value === null || value === undefined || value === '') {
-      return null;
-    }
-    
-    // If it's already a Date object
-    if (value instanceof Date) {
-      return value.toISOString().split('T')[0];
-    }
-    
-    // If it's an Excel serial number (number of days since 1900-01-01)
-    if (typeof value === 'number') {
-      // Excel epoch: December 30, 1899 (not January 1, 1900 due to Excel's bug)
-      const EXCEL_EPOCH = new Date(1899, 11, 30).getTime();
-      const date = new Date(EXCEL_EPOCH + value * 86400000);
-      return date.toISOString().split('T')[0];
-    }
-    
-    // If it's a string, try to parse it
-    if (typeof value === 'string') {
-      const date = new Date(value);
-      if (!isNaN(date.getTime())) {
-        return date.toISOString().split('T')[0];
-      }
-    }
-    
-    return null;
-  };
+  // Helper: Get cell value safely
+  function getCellValue(sheet: XLSX.WorkSheet, cell: string): any {
+    const cellObj = sheet[cell];
+    return cellObj ? cellObj.v : null;
+  }
   
   app.post("/api/excel/upload", upload.single('file'), async (req, res) => {
+    const startTime = Date.now();
+    
     try {
       if (!req.file) {
+        logExcelUpload.error('unknown', new Error('No file uploaded'));
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      // Log the exact file path
-      console.log('Excel file saved to:', req.file.path);
-
-      // Read Excel file from disk
-      const fileBuffer = fs.readFileSync(req.file.path);
-      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      const excelFileName = req.file.filename;
+      const fileSize = req.file.size;
       
-      const results = {
-        totalSheets: workbook.SheetNames.length,
-        successfulSheets: 0,
-        failedSheets: 0,
-        tankOrderIds: [] as string[],
-        sheetResults: [] as Array<{
-          sheetName: string;
-          sheetIndex: number;
-          status: 'success' | 'failed';
-          tankOrderId?: string;
-          error?: string;
-        }>
-      };
-
-      // Get the file hash (same for all sheets)
-      const fileHash = crypto
-        .createHash('sha1')
-        .update(fileBuffer)
-        .digest('hex');
-
-      // Process each sheet in the workbook
-      for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex++) {
-        const sheetName = workbook.SheetNames[sheetIndex];
-        const worksheet = workbook.Sheets[sheetName];
-
-        try {
-          const stats = {
-            rowsProcessed: 0,
-            rowsInserted: 0,
-            rowsSkipped: 0,
-            skippedReasons: [] as string[],
-            dictUpserts: { units: 0, qualities: 0, types: 0 }
-          };
-
-          // Create sheet upload record with file path
-          const sheetUpload = await storage.createSheetUpload({
-            filename: req.file.originalname,
-            sheet_name: sheetName,
-            file_hash_sha1: fileHash,
-            first_data_row: 8,
-            last_data_row: null,
-            file_path: req.file.filename // Store only filename, not full path
-          });
-
-          // Parse header data - FINAL CORRECTED mapping
-          // D2=Kod, D3=Müşteri adı, N2=Oluşturma tarihi
-          // I2=Tank çapı, K2=Silindir uzunluğu, P2=Satış fiyatı (Toplam €)
-          // H3=Hacim, I3=Ürün kalitesi, K3=Basınç, P3=Toplam ağırlık (kg)
-          const headerData = {
-            order_code: worksheet['D2']?.v || `${sheetName}-${Date.now()}`,  // D2: Kod, unique per sheet
-            customer_name: worksheet['D3']?.v || '',                     // D3: Müşteri adı
-            project_code: worksheet['H2']?.v || '',
-            diameter_mm: parseNumeric(worksheet['I2']?.v),               // I2: Tank çapı
-            length_mm: parseNumeric(worksheet['K2']?.v),                 // K2: Silindir uzunluğu
-            total_price_eur: parseNumeric(worksheet['P2']?.v),           // P2: Satış fiyatı (Toplam €)
-            created_date: parseExcelDate(worksheet['N2']?.v),            // N2: Oluşturma tarihi
-            temperature_c: parseNumeric(worksheet['R2']?.v),
-            revision_text: worksheet['E3']?.v || '',
-            category_label: worksheet['F3']?.v || '',
-            volume: parseNumeric(worksheet['H3']?.v),                    // H3: Hacim
-            material_grade: worksheet['I3']?.v || '',                    // I3: Ürün kalitesi
-            pressure_bar: parseNumeric(worksheet['K3']?.v),              // K3: Basınç
-            total_weight_kg: parseNumeric(worksheet['P3']?.v),           // P3: Toplam ağırlık (kg)
-            revision_no: worksheet['P3']?.v || '',
-            pressure_text: null,
-          };
-
-          // Create tank order with sheet tracking
-          const tankOrder = await storage.createTankOrder({
-            source_sheet_id: sheetUpload.id,
-            sheet_name: sheetName,
-            sheet_index: sheetIndex,
-            source_kind: 'Excel',
-            source_filename: req.file.originalname,
-            ...headerData
-          });
-
-          // Process cost items starting from row 8 (columns B-T)
-          let row = 8;
-          let lastDataRow = 7;
-          const maxRows = 1000;
-
-          while (row < maxRows) {
-            stats.rowsProcessed++;
-
-            // Read all columns B-T
-            const colB = worksheet[`B${row}`]?.v; // group_no
-            const colC = worksheet[`C${row}`]?.v; // line_no
-            const colD = worksheet[`D${row}`]?.v; // factor_name
-            const colE = worksheet[`E${row}`]?.v; // material_quality
-            const colF = worksheet[`F${row}`]?.v; // material_type
-            const colG = worksheet[`G${row}`]?.v; // dim_g_mm
-            const colH = worksheet[`H${row}`]?.v; // dim_h_mm
-            const colI = worksheet[`I${row}`]?.v; // dim_i_mm_kg
-            const colJ = worksheet[`J${row}`]?.v; // kg_per_m
-            const colK = worksheet[`K${row}`]?.v; // quantity
-            const colL = worksheet[`L${row}`]?.v; // total_qty
-            const colM = worksheet[`M${row}`]?.v; // unit
-            const colN = worksheet[`N${row}`]?.v; // unit_price_eur
-            const colO = worksheet[`O${row}`]?.v; // line_total_eur
-            const colP = worksheet[`P${row}`]?.v; // material_status
-            const colQ = worksheet[`Q${row}`]?.v; // is_atolye_iscilik
-            const colR = worksheet[`R${row}`]?.v; // is_dis_tedarik
-            const colS = worksheet[`S${row}`]?.v; // is_atolye_iscilik_2
-            const colT = worksheet[`T${row}`]?.v; // note
-            
-            // If completely empty row, try next
-            const hasAnyData = [colB, colC, colD, colE, colF, colG, colH, colI, colJ, colK, colL, colM, colN, colO, colP, colQ, colR, colS, colT].some(v => v !== undefined && v !== null && v !== '');
-            
-            if (!hasAnyData) {
-              row++;
-              continue;
-            }
-
-            lastDataRow = row;
-
-            // Check if factor_name exists but all side columns are empty
-            if (colD) {
-              const hasSideData = 
-                colE || colF || 
-                (colG && parseNumeric(colG)) || 
-                (colH && parseNumeric(colH)) || 
-                (colI && parseNumeric(colI)) || 
-                (colJ && parseNumeric(colJ)) || 
-                (colK && parseNumeric(colK)) || 
-                (colL && parseNumeric(colL)) || 
-                colM || 
-                (colN && parseNumeric(colN)) || 
-                (colO && parseNumeric(colO)) || 
-                colP || 
-                colQ || colR || colS || colT;
-
-              if (!hasSideData) {
-                stats.rowsSkipped++;
-                stats.skippedReasons.push(`Row ${row}: factor_name="${colD}" but all side columns empty`);
-                row++;
-                continue;
-              }
-
-              // Upsert dictionary values
-              let unitId = null;
-              let qualityId = null;
-              let typeId = null;
-
-              if (colM && typeof colM === 'string' && colM.trim()) {
-                unitId = await storage.upsertUomUnit(colM.trim());
-                stats.dictUpserts.units++;
-              }
-
-              if (colE && typeof colE === 'string' && colE.trim()) {
-                qualityId = await storage.upsertMaterialQuality(colE.trim());
-                stats.dictUpserts.qualities++;
-              }
-
-              if (colF && typeof colF === 'string' && colF.trim()) {
-                typeId = await storage.upsertMaterialType(colF.trim());
-                stats.dictUpserts.types++;
-              }
-
-              // Build cost item data
-              const costItemData: any = {
-                order_id: tankOrder.id,
-                group_no: parseInteger(colB),
-                line_no: parseInteger(colC),
-                factor_name: String(colD || ''),
-                material_quality_id: qualityId,
-                material_type_id: typeId,
-                dim_g_mm: parseNumeric(colG),
-                dim_h_mm: parseNumeric(colH),
-                dim_i_mm_kg: parseNumeric(colI),
-                kg_per_m: parseNumeric(colJ),
-                quantity: parseNumeric(colK),
-                total_qty: parseNumeric(colL),
-                unit_id: unitId,
-                unit_price_eur: parseNumeric(colN),
-                line_total_eur: parseNumeric(colO),
-                material_status: colP ? String(colP) : null,
-                is_atolye_iscilik: colQ ? Boolean(colQ) : null,
-                is_dis_tedarik: colR ? Boolean(colR) : null,
-                is_atolye_iscilik_2: colS ? Boolean(colS) : null,
-                note: colT ? String(colT) : null,
-              };
-
-              await storage.createCostItem(costItemData);
-              stats.rowsInserted++;
-            }
-
-            row++;
-          }
-
-          // Update sheet upload with last data row
-          await storage.updateSheetUpload(String(sheetUpload.id), {
-            last_data_row: lastDataRow
-          });
-
-          // Track success
-          results.successfulSheets++;
-          results.tankOrderIds.push(String(tankOrder.id));
-          results.sheetResults.push({
-            sheetName,
-            sheetIndex,
-            status: 'success',
-            tankOrderId: String(tankOrder.id)
-          });
-
-        } catch (sheetError) {
-          // Track failure
-          results.failedSheets++;
-          results.sheetResults.push({
-            sheetName,
-            sheetIndex,
-            status: 'failed',
-            error: sheetError instanceof Error ? sheetError.message : 'Unknown error'
-          });
-          console.error(`Error processing sheet "${sheetName}":`, sheetError);
-        }
-      }
-
-      // Return summary of all sheets
-      res.json({
-        success: true,
-        message: `Processed ${results.totalSheets} sheet(s): ${results.successfulSheets} successful, ${results.failedSheets} failed`,
-        results
+      // Log upload start
+      logExcelUpload.start(excelFileName, fileSize);
+      logger.info('Excel file received', {
+        filename: excelFileName,
+        size: fileSize,
+        mimetype: req.file.mimetype,
+        path: req.file.path
       });
 
+      // Read Excel file
+      const workbook = XLSX.readFile(req.file.path);
+      const sheetName = workbook.SheetNames[0]; // İlk sayfa
+      const sheet = workbook.Sheets[sheetName];
+      
+      logExcelUpload.sheetProcessing(sheetName, 'detecting...');
+      
+      try {
+        // Tank kodu kontrolü
+        const tankKodu = getCellValue(sheet, 'D2');
+        if (!tankKodu) {
+          logExcelUpload.cellReadError(excelFileName, 'D2', 'Tank kodu bulunamadı');
+          throw new Error('Tank kodu (D2) bulunamadı!');
+        }
+        
+        logExcelUpload.sheetProcessing(sheetName, String(tankKodu));
+        
+        // Parse tarih
+        const parseDate = (val: any): string | null => {
+          if (!val) return null;
+          if (typeof val === 'number') {
+            const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+            const date = new Date(excelEpoch.getTime() + val * 86400000);
+            if (!isNaN(date.getTime())) {
+              return date.toISOString().split('T')[0];
+            }
+          }
+          if (val instanceof Date) {
+            return val.toISOString().split('T')[0];
+          }
+          if (typeof val === 'string') {
+            const date = new Date(val);
+            if (!isNaN(date.getTime())) {
+              return date.toISOString().split('T')[0];
+            }
+          }
+          return null;
+        };
+        
+        // Tank data
+        const tankData = {
+          tank_kodu: String(tankKodu),
+          fiyat_tarihi: parseDate(getCellValue(sheet, 'N2')),
+          yalitim_kod: getCellValue(sheet, 'E2'),
+          yalitim_aciklama: getCellValue(sheet, 'E3'),
+          yalitim_malzeme: getCellValue(sheet, 'D3'),
+          karistirici_kod: getCellValue(sheet, 'F2'),
+          karistirici_aciklama: getCellValue(sheet, 'F3'),
+          ceket_kod: getCellValue(sheet, 'G2'),
+          ceket_aciklama: getCellValue(sheet, 'G3'),
+          cap_mm: extractNumber(getCellValue(sheet, 'I2')),
+          silindir_boyu_mm: extractNumber(getCellValue(sheet, 'K2')),
+          cevre_ara_hesap: extractNumber(getCellValue(sheet, 'M2')),
+          hacim_m3: extractNumber(getCellValue(sheet, 'H3')),
+          urun_kalitesi: getCellValue(sheet, 'I3'),
+          basinc_bar: extractNumber(getCellValue(sheet, 'K3')),
+          toplam_agirlik_kg: extractNumber(getCellValue(sheet, 'P3')),
+          satis_fiyati_eur: extractNumber(getCellValue(sheet, 'P2')),
+          sicaklik_c: extractNumber(getCellValue(sheet, 'Q3')),
+          ortam_c: extractNumber(getCellValue(sheet, 'R3')),
+          revizyon_no: extractNumber(getCellValue(sheet, 'O3')),
+          ozet_etiketi: getCellValue(sheet, 'M3'),
+        };
+        
+        console.log(`[Excel Upload] Tank: ${tankData.tank_kodu}, Date: ${tankData.fiyat_tarihi}`);
+        
+        // UPSERT tank
+        const tankResult = await db.execute(sql`
+          INSERT INTO tank (
+            tank_kodu, fiyat_tarihi, yalitim_kod, yalitim_aciklama, yalitim_malzeme,
+            karistirici_kod, karistirici_aciklama, ceket_kod, ceket_aciklama,
+            cap_mm, silindir_boyu_mm, cevre_ara_hesap, hacim_m3, urun_kalitesi,
+            basinc_bar, toplam_agirlik_kg, satis_fiyati_eur, sicaklik_c,
+            ortam_c, revizyon_no, ozet_etiketi, excel_file_path
+          ) VALUES (
+            ${tankData.tank_kodu}, ${tankData.fiyat_tarihi}, ${tankData.yalitim_kod},
+            ${tankData.yalitim_aciklama}, ${tankData.yalitim_malzeme}, ${tankData.karistirici_kod},
+            ${tankData.karistirici_aciklama}, ${tankData.ceket_kod}, ${tankData.ceket_aciklama},
+            ${tankData.cap_mm}, ${tankData.silindir_boyu_mm}, ${tankData.cevre_ara_hesap},
+            ${tankData.hacim_m3}, ${tankData.urun_kalitesi}, ${tankData.basinc_bar},
+            ${tankData.toplam_agirlik_kg}, ${tankData.satis_fiyati_eur}, ${tankData.sicaklik_c},
+            ${tankData.ortam_c}, ${tankData.revizyon_no}, ${tankData.ozet_etiketi}, ${excelFileName}
+          )
+          ON CONFLICT (tank_kodu, fiyat_tarihi) 
+          DO UPDATE SET
+            cap_mm = EXCLUDED.cap_mm,
+            silindir_boyu_mm = EXCLUDED.silindir_boyu_mm,
+            hacim_m3 = EXCLUDED.hacim_m3,
+            satis_fiyati_eur = EXCLUDED.satis_fiyati_eur,
+            toplam_agirlik_kg = EXCLUDED.toplam_agirlik_kg,
+            excel_file_path = EXCLUDED.excel_file_path,
+            updated_at = NOW()
+          RETURNING id;
+        `);
+        
+        const tankId = tankResult.rows[0].id;
+        logExcelUpload.tankCreated(String(tankId), tankData.tank_kodu);
+        
+        // Delete old items for clean reimport
+        await db.execute(sql`DELETE FROM tank_kalem WHERE tank_id = ${tankId}`);
+        
+        // Import items (rows 8-162)
+        let kalemCount = 0;
+        for (let row = 8; row <= 162; row++) {
+          const grupNo = getCellValue(sheet, `B${row}`);
+          const siraNo = getCellValue(sheet, `C${row}`);
+          const malyetFaktoru = getCellValue(sheet, `D${row}`);
+          
+          if (!grupNo && !siraNo && !malyetFaktoru) continue;
+          
+          await db.execute(sql`
+            INSERT INTO tank_kalem (
+              tank_id, grup_no, sira_no, maliyet_faktoru, malzeme_kalitesi, malzeme_tipi,
+              malzemenin_durumu, ebat_1_mm, ebat_2_mm, ebat_3, ebat_4, adet, toplam_miktar,
+              birim, birim_fiyat_eur, toplam_fiyat_eur, kategori_atolye_iscilik,
+              kategori_dis_tedarik, kategori_atolye_iscilik_2
+            ) VALUES (
+              ${tankId}, ${grupNo}, ${siraNo}, ${malyetFaktoru},
+              ${getCellValue(sheet, `E${row}`)}, ${getCellValue(sheet, `F${row}`)},
+              ${getCellValue(sheet, `P${row}`)}, ${extractNumber(getCellValue(sheet, `G${row}`))},
+              ${extractNumber(getCellValue(sheet, `H${row}`))}, ${extractNumber(getCellValue(sheet, `I${row}`))},
+              ${extractNumber(getCellValue(sheet, `J${row}`))}, ${extractNumber(getCellValue(sheet, `K${row}`))},
+              ${extractNumber(getCellValue(sheet, `L${row}`))}, ${getCellValue(sheet, `M${row}`)},
+              ${extractNumber(getCellValue(sheet, `N${row}`))}, ${extractNumber(getCellValue(sheet, `O${row}`))},
+              ${getCellValue(sheet, `Q${row}`) ? 1 : 0}, ${getCellValue(sheet, `R${row}`) ? 1 : 0},
+              ${getCellValue(sheet, `T${row}`) ? 1 : 0}
+            )
+          `);
+          kalemCount++;
+        }
+        
+        logExcelUpload.itemsImported(kalemCount, String(tankId));
+        
+        // Refresh view to include new tank
+        await db.execute(sql`REFRESH MATERIALIZED VIEW IF EXISTS orders_list_view`);
+        
+        // Calculate duration
+        const duration = Date.now() - startTime;
+        logExcelUpload.success(excelFileName, String(tankId), duration);
+        
+        res.json({
+          success: true,
+          message: 'Excel dosyası başarıyla yüklendi',
+          tankOrderId: String(tankId),
+          results: {
+            totalSheets: 1,
+            successfulSheets: 1,
+            failedSheets: 0,
+            tankOrderIds: [String(tankId)]
+          }
+        });
+        
+      } catch (sheetError) {
+        const error = sheetError instanceof Error ? sheetError : new Error(String(sheetError));
+        logExcelUpload.error(excelFileName, error, {
+          sheetName,
+          tankData: error.message.includes('Tank kodu') ? { cell: 'D2', issue: 'missing tank code' } : undefined
+        });
+        
+        res.status(500).json({
+          success: false,
+          message: 'Excel dosyası işlenemedi',
+          error: error.message,
+          results: {
+            totalSheets: 1,
+            successfulSheets: 0,
+            failedSheets: 1,
+            tankOrderIds: []
+          }
+        });
+      }
     } catch (error) {
-      console.error("Error processing Excel file:", error);
-      res.status(500).json({ 
-        message: "Failed to process Excel file",
-        error: error instanceof Error ? error.message : "Unknown error"
+      const err = error instanceof Error ? error : new Error(String(error));
+      logExcelUpload.error(req.file?.filename || 'unknown', err, {
+        stage: 'file_processing',
+        fileSize: req.file?.size,
+        mimetype: req.file?.mimetype
+      });
+      
+      res.status(500).json({
+        message: 'Excel dosyası yüklenemedi',
+        error: err.message
       });
     }
   });
@@ -1291,147 +1339,3 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   return httpServer;
 }
-
-// processExcelData function removed - replaced with manual data entry
-
-/*
-async function processExcelData(data: any[], fileBuffer?: Buffer, filename?: string, sheetName?: string): Promise<any[]> {
-  const processed: any[] = [];
-  
-  // Handle Turkish Excel structure
-  const rawData = data as any[];
-  
-  if (rawData.length < 8) {
-    console.log('Excel file too short, expected at least 8 rows');
-    return processed;
-  }
-
-  try {
-    // Extract header information from Excel (rows 1-3)
-    const formTitle = rawData[0]?.__EMPTY_2 || rawData[0]?.[2] || 'MALİYET ANALİZ FORMU';
-    const baseFormCode = rawData[1]?.__EMPTY_2 || rawData[1]?.[2] || `IMP-${Date.now()}`;
-    const formCode = sheetName ? `${baseFormCode}-${sheetName}` : baseFormCode;
-    const tankName = rawData[1]?.__EMPTY_5 || rawData[1]?.[5] || (sheetName || 'Imported Tank');
-    const tankWidth = rawData[1]?.__EMPTY_7 || rawData[1]?.[7];
-    const tankHeight = rawData[1]?.__EMPTY_9 || rawData[1]?.[9];
-    const tankType = rawData[2]?.__EMPTY_2 || rawData[2]?.[2] || 'Imported Type';
-    const materialGrade = rawData[2]?.__EMPTY_6 || rawData[2]?.[6];
-
-    // Prepare file data for storage
-    const fileData = fileBuffer ? fileBuffer.toString('base64') : null;
-    
-    // Create a vespro form for this import
-    const vesproForm = await storage.createVesproForm({
-      form_code: String(formCode),
-      client_name: 'Excel Import',
-      form_title: String(formTitle),
-      form_date: new Date().toISOString().split('T')[0],
-      revision_no: 0,
-      currency: 'EUR',
-      tank_name: String(tankName),
-      tank_type: String(tankType),
-      tank_width_mm: tankWidth && !isNaN(Number(tankWidth)) ? String(tankWidth) : null,
-      tank_height_mm: tankHeight && !isNaN(Number(tankHeight)) ? String(tankHeight) : null,
-      tank_material_grade: materialGrade ? String(materialGrade) : null,
-      notes: 'Imported from Excel',
-      metadata: {
-        importDate: new Date().toISOString(),
-        originalData: {
-          formTitle,
-          formCode,
-          tankName,
-          tankWidth,
-          tankHeight,
-          tankType,
-          materialGrade
-        }
-      },
-      // Store original Excel file
-      original_filename: filename || 'imported_file.xlsx',
-      file_data: fileData,
-    });
-
-    // Process cost items starting from row 8 (index 7)
-    const costItems = [];
-    
-    for (let i = 7; i < rawData.length; i++) {
-      const row = rawData[i];
-      if (!row) continue;
-
-      // Extract data from Turkish Excel columns
-      const grupNo = row.__EMPTY || row[0];
-      const siraNo = row.__EMPTY_1 || row[1];
-      const maliyetFaktoru = row.__EMPTY_2 || row[2];
-      const malzemeKalitesi = row.__EMPTY_3 || row[3];
-      const malzemeTipi = row.__EMPTY_4 || row[4];
-      const ebatA = row.__EMPTY_5 || row[5];
-      const ebatB = row.__EMPTY_6 || row[6];
-      const ebatC = row.__EMPTY_7 || row[7];
-      const adet = row.__EMPTY_9 || row[9];
-      const toplamMiktar = row.__EMPTY_10 || row[10];
-      const birim = row.__EMPTY_11 || row[11];
-      const birimFiyat = row.__EMPTY_12 || row[12];
-      const toplamFiyat = row.__EMPTY_13 || row[13];
-
-      // Helper function to check if value is numeric
-      const isValidNumber = (value: any): boolean => {
-        if (value === null || value === undefined || value === '') return false;
-        const str = String(value).trim();
-        if (str === '') return false;
-        // Skip Turkish headers or text entries
-        if (str.includes('GİDER') || str.includes('MALIYET') || str.includes('TOPLAM')) return false;
-        const num = parseFloat(str);
-        return !isNaN(num) && isFinite(num);
-      };
-
-      // Helper function to validate UOM values
-      const validateUOM = (value: any): string => {
-        if (!value) return 'kg'; // default
-        const str = String(value).trim().toLowerCase();
-        const validUOMs = ['kg', 'adet', 'm', 'mm', 'm2', 'm3', 'set', 'pcs', 'other'];
-        return validUOMs.includes(str) ? str : 'kg'; // fallback to kg
-      };
-
-      // Only process rows with meaningful data and valid numeric prices
-      if (maliyetFaktoru && 
-          isValidNumber(birimFiyat) && 
-          parseFloat(String(birimFiyat)) > 0) {
-        costItems.push({
-          form_id: vesproForm.form_id,
-          group_no: grupNo && isValidNumber(grupNo) ? parseInt(String(grupNo)) : 1,
-          seq_no: siraNo && isValidNumber(siraNo) ? parseInt(String(siraNo)) : costItems.length + 1,
-          cost_factor: String(maliyetFaktoru),
-          material_quality: malzemeKalitesi ? String(malzemeKalitesi) : null,
-          material_type: malzemeTipi ? String(malzemeTipi) : null,
-          dim_a_mm: ebatA && isValidNumber(ebatA) ? String(ebatA) : null,
-          dim_b_mm: ebatB && isValidNumber(ebatB) ? String(ebatB) : null,
-          dim_c_thickness_mm: ebatC && isValidNumber(ebatC) ? String(ebatC) : null,
-          quantity: adet && isValidNumber(adet) ? String(adet) : '1',
-          total_qty: toplamMiktar && isValidNumber(toplamMiktar) ? String(toplamMiktar) : (adet && isValidNumber(adet) ? String(adet) : '1'),
-          qty_uom: validateUOM(birim),
-          unit_price_eur: String(parseFloat(String(birimFiyat))),
-          total_price_eur: toplamFiyat && isValidNumber(toplamFiyat) ? String(parseFloat(String(toplamFiyat))) : String(parseFloat(String(birimFiyat))),
-        });
-      }
-    }
-
-    // Save cost items if any
-    if (costItems.length > 0) {
-      await storage.createVesproCostItems(costItems);
-      console.log(`Created ${costItems.length} cost items for form ${vesproForm.form_id}`);
-    }
-
-    processed.push({
-      form: vesproForm,
-      createdForm: vesproForm, // Add explicit createdForm reference for auto-analysis triggers
-      costItems: costItems.length,
-      sheetName: sheetName || 'Unknown'
-    });
-
-  } catch (error) {
-    console.error('Error processing Excel data:', error);
-  }
-  
-  return processed;
-}
-*/
